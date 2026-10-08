@@ -37,7 +37,7 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
 
 ## Status
 
-- Code and tests are done (`uv run pytest -q`). Version **0.1.0**.
+- Code and tests are done (`uv run pytest -q`). Version **0.1.1**.
 - Repo: **friedpuppet/ha-svitlobot-validator** (public, for HACS only; same "personal project" rules and PAT
   `~/.config/github/token-grid-load-shedding` as `../grid-load-shedding/AGENTS.md`).
 

@@ -30,11 +30,11 @@ class TelegramBot:
         self._session = session
         self._token = token
 
-    async def _call(self, method: str, timeout: float = 15, **params: Any) -> Any:
+    async def _call(self, method: str, http_timeout: float = 15, **params: Any) -> Any:
         url = API_URL.format(token=self._token, method=method)
         try:
             async with self._session.post(
-                url, json=params, timeout=aiohttp.ClientTimeout(total=timeout)
+                url, json=params, timeout=aiohttp.ClientTimeout(total=http_timeout)
             ) as resp:
                 body = await resp.json(content_type=None)
         except (aiohttp.ClientError, TimeoutError, ValueError) as err:
@@ -55,7 +55,7 @@ class TelegramBot:
         params: dict[str, Any] = {"timeout": POLL_TIMEOUT, "allowed_updates": ["channel_post"]}
         if offset is not None:
             params["offset"] = offset
-        return await self._call("getUpdates", timeout=POLL_TIMEOUT + 15, **params)
+        return await self._call("getUpdates", http_timeout=POLL_TIMEOUT + 15, **params)
 
     async def send_message(self, chat_id: int | str, text: str) -> bool:
         """Send plain text, retrying a couple of times; never raises."""
