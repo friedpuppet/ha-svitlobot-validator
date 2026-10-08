@@ -6,7 +6,8 @@ from homeassistant.data_entry_flow import FlowResultType
 
 from custom_components.svitlobot_validator.const import (
     CONF_FRESH_SECONDS,
-    CONF_GRID_ENTITY,
+    CONF_OWNER_CHAT,
+    CONF_PINGER_ENTITY,
     CONF_SOURCE_CHAT,
     CONF_TARGET_CHAT,
     CONF_TOKEN,
@@ -16,14 +17,15 @@ from custom_components.svitlobot_validator.const import (
     DOMAIN,
 )
 
-from .conftest import GOOD_TOKEN, GRID, SOURCE, TARGET, VOLTAGE, make_entry, setup_entry
+from .conftest import GOOD_TOKEN, OWNER, PINGER, SOURCE, TARGET, VOLTAGE, make_entry, setup_entry
 
 USER_INPUT = {
     "name": "Svitlobot",
     CONF_TOKEN: GOOD_TOKEN,
     CONF_SOURCE_CHAT: "@svitlobot_test",
     CONF_TARGET_CHAT: str(TARGET),
-    CONF_GRID_ENTITY: GRID,
+    CONF_OWNER_CHAT: str(OWNER),
+    CONF_PINGER_ENTITY: PINGER,
     CONF_VOLTAGE_ENTITY: VOLTAGE,
     CONF_VOLTAGE_MIN: 170,
     CONF_VOLTAGE_MAX: 280,
@@ -44,7 +46,22 @@ async def test_user_flow_creates_entry(hass: HomeAssistant, bot) -> None:
     assert result["data"] == {CONF_TOKEN: GOOD_TOKEN}
     assert result["options"][CONF_SOURCE_CHAT] == SOURCE  # @username resolved to the id
     assert result["options"][CONF_TARGET_CHAT] == TARGET
+    assert result["options"][CONF_OWNER_CHAT] == OWNER
     assert result["result"].unique_id == str(SOURCE)
+
+
+async def test_owner_is_optional(hass: HomeAssistant, bot) -> None:
+    result = await _start(hass)
+    user_input = {k: v for k, v in USER_INPUT.items() if k not in (CONF_OWNER_CHAT, CONF_PINGER_ENTITY)}
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input)
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert CONF_OWNER_CHAT not in result["options"]
+
+
+async def test_owner_must_have_started_the_bot(hass: HomeAssistant, bot) -> None:
+    result = await _start(hass)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {**USER_INPUT, CONF_OWNER_CHAT: "123456"})
+    assert result["errors"] == {CONF_OWNER_CHAT: "chat_not_found"}
 
 
 async def test_user_flow_errors(hass: HomeAssistant, bot) -> None:
@@ -69,7 +86,6 @@ async def test_user_flow_errors(hass: HomeAssistant, bot) -> None:
 
 
 async def test_options_flow(hass: HomeAssistant, bot) -> None:
-    hass.states.async_set(GRID, "on")
     entry = make_entry()
     await setup_entry(hass, entry)
 

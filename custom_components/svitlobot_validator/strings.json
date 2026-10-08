@@ -3,27 +3,29 @@
     "step": {
       "user": {
         "title": "Svitlobot Validator",
-        "description": "Watch a Svitlobot Telegram channel and, when it reports a power outage, check it against a local grid sensor and a voltage meter powered from the grid. The verdict is posted to another chat. The bot must be an admin of both chats.",
+        "description": "Watch a Svitlobot Telegram channel and check its posts against a voltage meter powered from the grid (e.g. before the inverter). Verdicts go to another chat; problems on your side (the grid is fine but Svitlobot says it's gone) also go to you privately. The bot must be an admin of both channels.",
         "data": {
           "name": "Name",
           "token": "Bot token",
           "source_chat": "Svitlobot channel",
           "target_chat": "Post verdicts to",
-          "grid_entity": "Grid sensor",
           "voltage_entity": "Grid voltage meter",
           "voltage_min": "Lowest acceptable voltage",
           "voltage_max": "Highest acceptable voltage",
-          "fresh_seconds": "Meter counts as alive for"
+          "fresh_seconds": "Meter counts as alive for",
+          "owner_chat": "Notify me privately",
+          "pinger_entity": "Pinger"
         },
         "data_description": {
           "token": "From @BotFather. The bot reads the Svitlobot channel and posts the verdicts.",
           "source_chat": "Chat id (-100…) or @username of the channel Svitlobot posts to.",
           "target_chat": "Chat id (-100…) or @username of the chat that gets the verdicts.",
-          "grid_entity": "Binary sensor that is on while the grid is present (as the inverter sees it).",
-          "voltage_entity": "Voltage of a meter powered straight from the grid (e.g. before the inverter). While it keeps reporting, the grid is physically there.",
+          "voltage_entity": "Voltage of a meter powered straight from the grid (e.g. before the inverter). While it keeps reporting, the grid is physically there; it alone decides.",
           "voltage_min": "Usually the inverter's lowest accepted grid voltage.",
           "voltage_max": "Usually the inverter's highest accepted grid voltage.",
-          "fresh_seconds": "The meter is considered powered while its last report is at most this old."
+          "fresh_seconds": "The meter is considered powered while its last report is at most this old.",
+          "owner_chat": "Optional. Your Telegram user id (or @username). Press Start in the bot first, otherwise it can't message you. You get a note when the grid is fine but Svitlobot reports an outage (a pinger or Svitlobot glitch).",
+          "pinger_entity": "Optional. Binary sensor that is on while the device pinging Svitlobot is reachable; its state goes into the private note."
         }
       }
     },
@@ -44,20 +46,22 @@
         "data": {
           "source_chat": "Svitlobot channel",
           "target_chat": "Post verdicts to",
-          "grid_entity": "Grid sensor",
           "voltage_entity": "Grid voltage meter",
           "voltage_min": "Lowest acceptable voltage",
           "voltage_max": "Highest acceptable voltage",
-          "fresh_seconds": "Meter counts as alive for"
+          "fresh_seconds": "Meter counts as alive for",
+          "owner_chat": "Notify me privately",
+          "pinger_entity": "Pinger"
         },
         "data_description": {
           "source_chat": "Chat id (-100…) or @username of the channel Svitlobot posts to.",
           "target_chat": "Chat id (-100…) or @username of the chat that gets the verdicts.",
-          "grid_entity": "Binary sensor that is on while the grid is present (as the inverter sees it).",
-          "voltage_entity": "Voltage of a meter powered straight from the grid (e.g. before the inverter). While it keeps reporting, the grid is physically there.",
+          "voltage_entity": "Voltage of a meter powered straight from the grid (e.g. before the inverter). While it keeps reporting, the grid is physically there; it alone decides.",
           "voltage_min": "Usually the inverter's lowest accepted grid voltage.",
           "voltage_max": "Usually the inverter's highest accepted grid voltage.",
-          "fresh_seconds": "The meter is considered powered while its last report is at most this old."
+          "fresh_seconds": "The meter is considered powered while its last report is at most this old.",
+          "owner_chat": "Optional. Your Telegram user id (or @username). Press Start in the bot first, otherwise it can't message you. You get a note when the grid is fine but Svitlobot reports an outage (a pinger or Svitlobot glitch).",
+          "pinger_entity": "Optional. Binary sensor that is on while the device pinging Svitlobot is reachable; its state goes into the private note."
         }
       }
     },
