@@ -14,7 +14,8 @@ from homeassistant.util import dt as dt_util
 
 from custom_components.svitlobot_validator.const import (
     CONF_FRESH_SECONDS,
-    CONF_GRID_ENTITY,
+    CONF_OWNER_CHAT,
+    CONF_PINGER_ENTITY,
     CONF_SOURCE_CHAT,
     CONF_TARGET_CHAT,
     CONF_TOKEN,
@@ -25,10 +26,11 @@ from custom_components.svitlobot_validator.const import (
 )
 from custom_components.svitlobot_validator.telegram import TelegramAuthError, TelegramError
 
-GRID = "binary_sensor.grid"
+PINGER = "binary_sensor.pinger"
 VOLTAGE = "sensor.meter_voltage"
 SOURCE = -1001111111111
 TARGET = -1002222222222
+OWNER = 505993907
 VERDICT = "sensor.svitlobot_last_verdict"
 TEST_BUTTON = "button.svitlobot_send_test_message"
 GOOD_TOKEN = "123:abc"
@@ -37,7 +39,7 @@ GOOD_TOKEN = "123:abc"
 class FakeBot:
     """Stands in for TelegramBot; updates are fed by the test."""
 
-    chats = {SOURCE: "svitlobot_test", TARGET: None, "@svitlobot_test": "svitlobot_test"}
+    chats = {SOURCE: "svitlobot_test", TARGET: None, OWNER: None, "@svitlobot_test": "svitlobot_test"}
 
     def __init__(self) -> None:
         self.token = GOOD_TOKEN
@@ -104,7 +106,8 @@ def make_entry(**options: Any) -> MockConfigEntry:
         options={
             CONF_SOURCE_CHAT: SOURCE,
             CONF_TARGET_CHAT: TARGET,
-            CONF_GRID_ENTITY: GRID,
+            CONF_OWNER_CHAT: OWNER,
+            CONF_PINGER_ENTITY: PINGER,
             CONF_VOLTAGE_ENTITY: VOLTAGE,
             CONF_VOLTAGE_MIN: 170,
             CONF_VOLTAGE_MAX: 280,

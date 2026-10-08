@@ -19,7 +19,8 @@ from homeassistant.util import dt as dt_util
 from .const import (
     ATTR_TEXT,
     CONF_FRESH_SECONDS,
-    CONF_GRID_ENTITY,
+    CONF_OWNER_CHAT,
+    CONF_PINGER_ENTITY,
     CONF_SOURCE_CHAT,
     CONF_TARGET_CHAT,
     CONF_TOKEN,
@@ -99,15 +100,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: SvitlobotValidatorConfig
     async def send(text: str) -> bool:
         return await bot.send_message(target_chat, text)
 
+    owner_chat = opts.get(CONF_OWNER_CHAT)
+
+    async def send_owner(text: str) -> bool:
+        return await bot.send_message(owner_chat, text)
+
     validator = Validator(
         hass,
         persisted,
-        grid_entity=opts[CONF_GRID_ENTITY],
         voltage_entity=opts[CONF_VOLTAGE_ENTITY],
         voltage_min=opts.get(CONF_VOLTAGE_MIN, DEFAULT_VOLTAGE_MIN),
         voltage_max=opts.get(CONF_VOLTAGE_MAX, DEFAULT_VOLTAGE_MAX),
         fresh_seconds=opts.get(CONF_FRESH_SECONDS, DEFAULT_FRESH_SECONDS),
+        pinger_entity=opts.get(CONF_PINGER_ENTITY) or None,
         send=send,
+        send_owner=send_owner if owner_chat else None,
     )
 
     async def on_post(post: dict[str, Any]) -> None:

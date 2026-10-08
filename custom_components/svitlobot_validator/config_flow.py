@@ -15,7 +15,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     CONF_FRESH_SECONDS,
-    CONF_GRID_ENTITY,
+    CONF_OWNER_CHAT,
+    CONF_PINGER_ENTITY,
     CONF_SOURCE_CHAT,
     CONF_TARGET_CHAT,
     CONF_TOKEN,
@@ -36,13 +37,16 @@ def _volts() -> selector.NumberSelector:
     )
 
 
+def _suggested(defaults: dict[str, Any], key: str) -> dict[str, Any] | None:
+    value = defaults.get(key)
+    return {"suggested_value": value} if value not in (None, "") else None
+
+
 def _options_schema(defaults: dict[str, Any]) -> dict:
     return {
         vol.Required(CONF_SOURCE_CHAT, default=defaults.get(CONF_SOURCE_CHAT, vol.UNDEFINED)): selector.TextSelector(),
         vol.Required(CONF_TARGET_CHAT, default=defaults.get(CONF_TARGET_CHAT, vol.UNDEFINED)): selector.TextSelector(),
-        vol.Required(CONF_GRID_ENTITY, default=defaults.get(CONF_GRID_ENTITY, vol.UNDEFINED)): selector.EntitySelector(
-            selector.EntitySelectorConfig(domain="binary_sensor")
-        ),
+        vol.Optional(CONF_OWNER_CHAT, description=_suggested(defaults, CONF_OWNER_CHAT)): selector.TextSelector(),
         vol.Required(CONF_VOLTAGE_ENTITY, default=defaults.get(CONF_VOLTAGE_ENTITY, vol.UNDEFINED)): selector.EntitySelector(
             selector.EntitySelectorConfig(domain="sensor", device_class=SensorDeviceClass.VOLTAGE)
         ),
@@ -50,6 +54,9 @@ def _options_schema(defaults: dict[str, Any]) -> dict:
         vol.Required(CONF_VOLTAGE_MAX, default=defaults.get(CONF_VOLTAGE_MAX, DEFAULT_VOLTAGE_MAX)): _volts(),
         vol.Required(CONF_FRESH_SECONDS, default=defaults.get(CONF_FRESH_SECONDS, DEFAULT_FRESH_SECONDS)): selector.NumberSelector(
             selector.NumberSelectorConfig(min=10, max=3600, step=1, unit_of_measurement="s", mode=selector.NumberSelectorMode.BOX)
+        ),
+        vol.Optional(CONF_PINGER_ENTITY, description=_suggested(defaults, CONF_PINGER_ENTITY)): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="binary_sensor")
         ),
     }
 
@@ -67,7 +74,10 @@ async def _validate(hass: HomeAssistant, token: str, user_input: dict[str, Any],
         return user_input
 
     options = dict(user_input)
-    for key in (CONF_SOURCE_CHAT, CONF_TARGET_CHAT):
+    for key in (CONF_SOURCE_CHAT, CONF_TARGET_CHAT, CONF_OWNER_CHAT):
+        if key == CONF_OWNER_CHAT and not str(user_input.get(key) or "").strip():
+            options.pop(key, None)
+            continue
         try:
             chat = await bot.get_chat(str(user_input[key]).strip())
         except TelegramError:
@@ -127,7 +137,7 @@ class SvitlobotValidatorOptionsFlow(OptionsFlow):
             if not errors:
                 return self.async_create_entry(data=options)
         defaults = user_input or {
-            k: (str(v) if k in (CONF_SOURCE_CHAT, CONF_TARGET_CHAT) else v)
+            k: (str(v) if k in (CONF_SOURCE_CHAT, CONF_TARGET_CHAT, CONF_OWNER_CHAT) else v)
             for k, v in self.config_entry.options.items()
         }
         return self.async_show_form(step_id="init", data_schema=vol.Schema(_options_schema(defaults)), errors=errors)

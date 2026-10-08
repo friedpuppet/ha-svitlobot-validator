@@ -2,8 +2,8 @@
 
 Subproject of `homeassistant`. This is the HA custom integration **`svitlobot_validator`** ("Svitlobot
 Validator"). It reads @SvitloUkraineBot's posts in the channel `@svitlobot_kyiv_dashkevycha_4` through our bot and checks every
-"🔴 … Світло зникло" against `binary_sensor.e_elektrika` and the ZHA meter before the inverter
-(`sensor.lichilnik_pered_invertorom_napruga`). Behaviour is in `README.md`.
+"🔴 … Світло зникло" against the ZHA meter before the inverter
+(`sensor.lichilnik_pered_invertorom_napruga`) only. Behaviour is in `README.md`.
 
 ## Shared Home Assistant context
 
@@ -37,10 +37,10 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
 
 ## Status
 
-- Code and tests are done (`uv run pytest -q`). Version **0.1.5**.
+- Code and tests are done (`uv run pytest -q`). Version **0.2.0**.
 - **Installed on the live HA (2026-10-08)** via HACS custom repository (HACS repo id `1410267100`), entry «Світлобот»
   `01M4DQ0BMA0749WWZGGW8ZZQXA` (created through the config flow REST API). Source `-1002234976277`, target
-  `-1003971371667`, grid `binary_sensor.e_elektrika`, meter `sensor.lichilnik_pered_invertorom_napruga`, 170–280 V, 60 s.
+  `-1003971371667`, meter `sensor.lichilnik_pered_invertorom_napruga`, 170–280 V, 60 s.
   - Entities: `sensor.svitlobot_last_verdict`, `button.svitlobot_send_test_message`; service `svitlobot_validator.check`.
   - State (offset, brownout flag, last verdict): `.storage/svitlobot_validator.<entry_id>`.
   - **Updating**: release (bump `manifest.json` + `pyproject.toml`), then WS `hacs/repository/download` with
@@ -55,11 +55,14 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
   - Since v0.1.4 the posts carry no link to the Svitlobot post and don't quote the 170–280 V range ("нижча/вища за
     допустиму" only): the real limits are set on an offline voltage relay that HA can't see (the user's call). The
     range options still decide below/above/within; `post_link` stays a sensor attribute.
-  - **Meter first** since v0.1.5 (the user's call): `e_elektrika` is the *inverter's* view (inverter grid voltage >
-    170 V, pinger as fallback; the meter isn't in that chain). Meter alive + in range → false alarm even with
-    `e_elektrika` off (the inverter or the pinger is at fault, not the grid); meter alive + out of range → brownout
-    post; meter silent → `e_elektrika` on = false alarm without voltage, otherwise silent. Inverter/pinger trouble
-    isn't the channel's business; a separate private alert could be added later.
+  - **Meter only** since v0.2.0 (the user's call): `e_elektrika` is the *inverter's* view (inverter grid voltage >
+    170 V, pinger as fallback; the meter isn't in that chain), so it's not used at all. Meter alive + in range →
+    false alarm in the channel **plus a private note to the user** (id `505993907`, @yyyell, `owner_chat`) with the
+    pinger's state (`binary_sensor.esp_svitlobot_pinger_local`): a pinger or Svitlobot glitch isn't the channel's
+    business. Meter alive + out of range → brownout post. Meter silent → silent.
+  - Brownout start = first out-of-range meter reading after the last normal one (recorder, `unavailable` gaps
+    skipped). The "back to normal" summary is sent when Svitlobot posts «Світло з'явилося» (the user's call), with
+    "З HH:MM до HH:MM напруга була поза нормою: lo–hi В".
   - Verified live 2026-10-08: polling works (offset stored), the test button and `check` (→ `false_alarm`) post into
     the test channel. The brownout and back-to-normal branches haven't been seen live yet.
 - Repo: **friedpuppet/ha-svitlobot-validator** (public, for HACS only; same "personal project" rules and PAT
