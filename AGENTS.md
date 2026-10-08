@@ -37,7 +37,7 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
 
 ## Status
 
-- Code and tests are done (`uv run pytest -q`). Version **0.1.1**.
+- Code and tests are done (`uv run pytest -q`). Version **0.1.2**.
 - **Installed on the live HA (2026-10-08)** via HACS custom repository (HACS repo id `1410267100`), entry «Світлобот»
   `01M4DQ0BMA0749WWZGGW8ZZQXA` (created through the config flow REST API). Source `-1002234976277`, target
   `-1003971371667`, grid `binary_sensor.e_elektrika`, meter `sensor.lichilnik_pered_invertorom_napruga`, 170–280 V, 60 s.

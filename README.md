@@ -15,15 +15,15 @@ reads the Svitlobot channel through your own bot and, for every "Світло з
 
 | Grid sensor | Meter | Post to the target chat |
 |---|---|---|
-| on | — | "⚠️ Електрика насправді є, повідомлення від Світлобота є, ймовірно, помилковим." + voltage |
-| off | alive | "⚡ Електрика є, але параметри за межами допустимих." + the voltage vs. the allowed range, and the range seen since the grid sensor went off |
+| on | — | "⚠️ Мережа є: 230 В. Повідомлення Світлобота, ймовірно, помилкове." |
+| off | alive | "⚡ Мережа є, але її параметри поза нормою." + the voltage vs. the allowed range, and the range seen since the grid sensor went off |
 | off | silent | nothing (a real outage) |
 
-After a brownout post, once the grid sensor turns back on, it posts "✅ Напруга повернулась у норму: 185 В.
-Чекайте оновлення від Світлобота." If the meter goes silent first (the brownout became a real outage), that
+After a brownout post, once the grid sensor turns back on, it posts "✅ Напруга повернулася в норму: 185 В.
+Світлобот невдовзі оновить статус." If the meter goes silent first (the brownout became a real outage), that
 post is skipped.
 
-Each post links to the Svitlobot post it answers. Posts older than 15 minutes (e.g. a backlog after HA was
+Each post ends with "Джерело:" and a link to the Svitlobot post it answers. Posts older than 15 minutes (e.g. a backlog after HA was
 down) are not checked.
 
 ## Setup

@@ -1,6 +1,6 @@
 [project]
 name = "ha-svitlobot-validator"
-version = "0.1.1"
+version = "0.1.2"
 description = "Home Assistant integration: check Svitlobot outage posts against local grid sensors"
 requires-python = ">=3.14.2"
 

@@ -159,9 +159,9 @@ class Validator:
             if self.brownout:
                 self._set_brownout(False)
                 voltage = self.meter_voltage()
-                text = "✅ Напруга повернулась у норму"
+                text = "✅ Напруга повернулася в норму"
                 text += f": {_volts(voltage)}." if voltage is not None else "."
-                text += " Чекайте оновлення від Світлобота."
+                text += " Світлобот невдовзі оновить статус."
                 self.hass.async_create_task(self._send(text), eager_start=True)
 
     @callback
@@ -192,18 +192,21 @@ class Validator:
         lines: list[str] = []
         if grid is not None and grid.state == STATE_ON:
             verdict = VERDICT_FALSE_ALARM
-            lines.append("⚠️ Електрика насправді є, повідомлення від Світлобота є, ймовірно, помилковим.")
-            if voltage is not None:
-                lines.append(f"Напруга: {_volts(voltage)}.")
+            grid_line = f"⚠️ Мережа є: {_volts(voltage)}." if voltage is not None else "⚠️ Мережа є."
+            lines.append(f"{grid_line} Повідомлення Світлобота, ймовірно, помилкове.")
         elif voltage is not None:
             verdict = VERDICT_OUT_OF_RANGE
-            lines.append("⚡ Електрика є, але параметри за межами допустимих.")
+            lines.append("⚡ Мережа є, але її параметри поза нормою.")
             lines.append(self._voltage_detail(voltage))
             if self.outage_since is not None and self.voltage_low is not None:
                 since = dt_util.as_local(self.outage_since).strftime("%H:%M")
-                lines.append(
-                    f"З {since} напруга була від {_volts(self.voltage_low)} до {_volts(self.voltage_high)}."
-                )
+                if round(self.voltage_low) == round(self.voltage_high):
+                    lines.append(f"Від {since} напруга тримається на рівні {_volts(self.voltage_low)}.")
+                else:
+                    lines.append(
+                        f"Від {since} напруга коливається в межах "
+                        f"{self.voltage_low:.0f}–{_volts(self.voltage_high)}."
+                    )
             self._set_brownout(True)
         else:
             verdict = VERDICT_CONFIRMED
@@ -211,7 +214,7 @@ class Validator:
         message = None
         if lines:
             if link:
-                lines.append(f"Пост Світлобота: {link}")
+                lines.append(f"Джерело: {link}")
             message = "\n".join(lines)
 
         self._persisted.data["last"] = {
@@ -230,7 +233,7 @@ class Validator:
     def _voltage_detail(self, voltage: float) -> str:
         allowed = f"{self._vmin:.0f}–{self._vmax:.0f} В"
         if voltage < self._vmin:
-            return f"Напруга {_volts(voltage)} — нижче допустимої ({allowed})."
+            return f"Напруга {_volts(voltage)} — нижча за допустиму ({allowed})."
         if voltage > self._vmax:
-            return f"Напруга {_volts(voltage)} — вище допустимої ({allowed})."
-        return f"Напруга {_volts(voltage)} у межах {allowed}, але наш датчик мережі її не бачить."
+            return f"Напруга {_volts(voltage)} — вища за допустиму ({allowed})."
+        return f"Напруга {_volts(voltage)} — у допустимих межах ({allowed}), але наш датчик мережі її не фіксує."
