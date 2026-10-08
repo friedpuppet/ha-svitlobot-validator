@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
+import logging
 import re
 from typing import Any
 
+from homeassistant.components.recorder import get_instance, history
 from homeassistant.const import STATE_OFF, STATE_ON
 from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
@@ -20,10 +22,14 @@ from .const import (
 )
 from .storage import Persisted
 
+_LOGGER = logging.getLogger(__name__)
+
 # Svitlobot: "🔴 14:12 Світло зникло"
 OUTAGE_RE = re.compile(r"Світло\s+зникло", re.IGNORECASE)
 
 STALE_CHECK_INTERVAL = timedelta(seconds=30)
+# How far back to look for the start of the current outage.
+HISTORY_LOOKBACK = timedelta(hours=24)
 
 
 def is_outage_post(text: str) -> bool:
@@ -32,6 +38,38 @@ def is_outage_post(text: str) -> bool:
 
 def _volts(value: float) -> str:
     return f"{value:.0f} В"
+
+
+def _float(value: str) -> float | None:
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def outage_history(
+    hass: HomeAssistant, grid_entity: str, voltage_entity: str, now: datetime
+) -> tuple[datetime | None, list[float]]:
+    """From the recorder: when the grid sensor last went off, and the meter's readings since then.
+
+    Runs in the recorder's executor. Restarts re-write the same "off" state (with a new
+    ``last_changed``), so the start is the first "off" after the last "on", not the last row.
+    """
+    grid = history.state_changes_during_period(
+        hass, now - HISTORY_LOOKBACK, now, grid_entity, no_attributes=True
+    ).get(grid_entity, [])
+    since: datetime | None = None
+    for state in grid:
+        if state.state == STATE_ON:
+            since = None
+        elif state.state == STATE_OFF and since is None:
+            since = state.last_changed
+    if since is None:
+        return None, []
+    meter = history.state_changes_during_period(
+        hass, since, now, voltage_entity, no_attributes=True
+    ).get(voltage_entity, [])
+    return since, [v for state in meter if (v := _float(state.state)) is not None]
 
 
 class Validator:
@@ -60,10 +98,6 @@ class Validator:
         self._listeners: list[CALLBACK_TYPE] = []
         self._unsubs: list[CALLBACK_TYPE] = []
         self._unsub_stale: CALLBACK_TYPE | None = None
-        # Since when our grid sensor says "off", and the meter's voltage range since then.
-        self.outage_since: datetime | None = None
-        self.voltage_low: float | None = None
-        self.voltage_high: float | None = None
 
     # --- persisted state -------------------------------------------------
 
@@ -91,16 +125,11 @@ class Validator:
     @callback
     def async_start(self) -> None:
         grid = self.hass.states.get(self._grid_entity)
-        if grid is not None and grid.state == STATE_OFF:
-            self._start_outage(grid.last_changed)
         if self.brownout:
             # Grid came back while HA was down: too late for the "back to normal" post.
             self._set_brownout(grid is None or grid.state != STATE_ON)
         self._unsubs.append(
             async_track_state_change_event(self.hass, [self._grid_entity], self._on_grid)
-        )
-        self._unsubs.append(
-            async_track_state_change_event(self.hass, [self._voltage_entity], self._on_voltage)
         )
 
     @callback
@@ -135,44 +164,16 @@ class Validator:
         age = (dt_util.utcnow() - state.last_reported).total_seconds()
         return value if age <= self._fresh else None
 
-    def _start_outage(self, since: datetime) -> None:
-        self.outage_since = since
-        self.voltage_low = self.voltage_high = None
-        self._track_voltage(self.meter_voltage())
-
-    def _track_voltage(self, value: float | None) -> None:
-        if value is None or self.outage_since is None:
-            return
-        self.voltage_low = value if self.voltage_low is None else min(self.voltage_low, value)
-        self.voltage_high = value if self.voltage_high is None else max(self.voltage_high, value)
-
     @callback
     def _on_grid(self, event: Event[EventStateChangedData]) -> None:
-        old, new = event.data["old_state"], event.data["new_state"]
-        if new is None:
-            return
-        if new.state == STATE_OFF and (old is None or old.state != STATE_OFF):
-            self._start_outage(new.last_changed)
-        elif new.state == STATE_ON:
-            self.outage_since = None
-            self.voltage_low = self.voltage_high = None
-            if self.brownout:
-                self._set_brownout(False)
-                voltage = self.meter_voltage()
-                text = "✅ Напруга повернулася в норму"
-                text += f": {_volts(voltage)}." if voltage is not None else "."
-                text += " Світлобот невдовзі оновить статус."
-                self.hass.async_create_task(self._send(text), eager_start=True)
-
-    @callback
-    def _on_voltage(self, event: Event[EventStateChangedData]) -> None:
         new = event.data["new_state"]
-        if new is None:
-            return
-        try:
-            self._track_voltage(float(new.state))
-        except ValueError:
-            return
+        if new is not None and new.state == STATE_ON and self.brownout:
+            self._set_brownout(False)
+            voltage = self.meter_voltage()
+            text = "✅ Напруга повернулася в норму"
+            text += f": {_volts(voltage)}." if voltage is not None else "."
+            text += " Світлобот невдовзі оновить статус."
+            self.hass.async_create_task(self._send(text), eager_start=True)
 
     @callback
     def _stale_check(self, _now: datetime) -> None:
@@ -198,15 +199,8 @@ class Validator:
             verdict = VERDICT_OUT_OF_RANGE
             lines.append("⚡ Мережа є, але її параметри поза нормою.")
             lines.append(self._voltage_detail(voltage))
-            if self.outage_since is not None and self.voltage_low is not None:
-                since = dt_util.as_local(self.outage_since).strftime("%H:%M")
-                if round(self.voltage_low) == round(self.voltage_high):
-                    lines.append(f"Від {since} напруга тримається на рівні {_volts(self.voltage_low)}.")
-                else:
-                    lines.append(
-                        f"Від {since} напруга коливається в межах "
-                        f"{self.voltage_low:.0f}–{_volts(self.voltage_high)}."
-                    )
+            if range_line := await self._range_line(voltage):
+                lines.append(range_line)
             self._set_brownout(True)
         else:
             verdict = VERDICT_CONFIRMED
@@ -229,6 +223,23 @@ class Validator:
         if message:
             await self._send(message)
         return verdict
+
+    async def _range_line(self, voltage: float) -> str | None:
+        """ "Від 14:12 напруга коливається в межах 140–177 В." from the recorder's history."""
+        try:
+            since, values = await get_instance(self.hass).async_add_executor_job(
+                outage_history, self.hass, self._grid_entity, self._voltage_entity, dt_util.utcnow()
+            )
+        except Exception:
+            _LOGGER.exception("Could not read the outage history")
+            return None
+        if since is None:
+            return None
+        low, high = min(values + [voltage]), max(values + [voltage])
+        start = dt_util.as_local(since).strftime("%H:%M")
+        if round(low) == round(high):
+            return f"Від {start} напруга тримається на рівні {_volts(low)}."
+        return f"Від {start} напруга коливається в межах {low:.0f}–{_volts(high)}."
 
     def _voltage_detail(self, voltage: float) -> str:
         allowed = f"{self._vmin:.0f}–{self._vmax:.0f} В"
