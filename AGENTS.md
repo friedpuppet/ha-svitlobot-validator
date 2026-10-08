@@ -38,6 +38,17 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
 ## Status
 
 - Code and tests are done (`uv run pytest -q`). Version **0.1.1**.
+- **Installed on the live HA (2026-10-08)** via HACS custom repository (HACS repo id `1410267100`), entry «Світлобот»
+  `01M4DQ0BMA0749WWZGGW8ZZQXA` (created through the config flow REST API). Source `-1002234976277`, target
+  `-1003971371667`, grid `binary_sensor.e_elektrika`, meter `sensor.lichilnik_pered_invertorom_napruga`, 170–280 V, 60 s.
+  - Entities: `sensor.svitlobot_last_verdict`, `button.svitlobot_send_test_message`; service `svitlobot_validator.check`.
+  - State (offset, brownout flag, last verdict): `.storage/svitlobot_validator.<entry_id>`.
+  - **Updating**: release (bump `manifest.json` + `pyproject.toml`), then WS `hacs/repository/download` with
+    `repository: "1410267100"`, `version: "vX.Y.Z"`, then `ha core check` + `ha core restart`.
+  - v0.1.0 never polled: Telegram's `timeout` param clashed with `_call`'s HTTP timeout (tests used a fake bot).
+    Fixed in v0.1.1, plus `tests/test_telegram.py` against a mocked API.
+  - Verified live 2026-10-08: polling works (offset stored), the test button and `check` (→ `false_alarm`) post into
+    the test channel. The brownout and back-to-normal branches haven't been seen live yet.
 - Repo: **friedpuppet/ha-svitlobot-validator** (public, for HACS only; same "personal project" rules and PAT
   `~/.config/github/token-grid-load-shedding` as `../grid-load-shedding/AGENTS.md`).
 
