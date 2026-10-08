@@ -33,7 +33,7 @@ At 14:12 Kyiv Svitlobot posted an outage. In fact the meter before the inverter 
 (UPS range ≈170–280 V) dropped the grid at ~177 V (`e_elektrika` off 11:12:46–11:32:37 UTC), and the pinger ESP went
 dark too. The user then posted by hand "Світло номінально є, але напруга занизька". The ZHA meter
 is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "meter alive" is judged by
-`last_reported` ≤ 60 s (it reports every ~7 s).
+`last_reported` ≤ 60 s. (Observed later: ZHA marked it unavailable ~2 min after an outage; the check stays) (it reports every ~7 s).
 
 ## Status
 
@@ -47,6 +47,11 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
     `repository: "1410267100"`, `version: "vX.Y.Z"`, then `ha core check` + `ha core restart`.
   - v0.1.0 never polled: Telegram's `timeout` param clashed with `_call`'s HTTP timeout (tests used a fake bot).
     Fixed in v0.1.1, plus `tests/test_telegram.py` against a mocked API.
+  - The brownout post's «Від HH:MM напруга коливається в межах …» comes from the **recorder** (`validator.outage_history`:
+    first `off` after the last `on` of the grid sensor within 24 h, then the meter's readings since then), not from
+    in-memory tracking: a restart re-writes the state with a new `last_changed` (v0.1.3, the user's call).
+  - Real outage 2026-10-08 15:26 Kyiv: Svitlobot's post 1608 was checked the same second → `confirmed`, silent. The ZHA
+    meter went `unavailable` ~2 min after the grid dropped (faster than the ~2 h I assumed); the 60 s freshness stays.
   - Verified live 2026-10-08: polling works (offset stored), the test button and `check` (→ `false_alarm`) post into
     the test channel. The brownout and back-to-normal branches haven't been seen live yet.
 - Repo: **friedpuppet/ha-svitlobot-validator** (public, for HACS only; same "personal project" rules and PAT
