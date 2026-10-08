@@ -41,6 +41,8 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
 - **Installed on the live HA (2026-10-08)** via HACS custom repository (HACS repo id `1410267100`), entry «Світлобот»
   `01M4DQ0BMA0749WWZGGW8ZZQXA` (created through the config flow REST API). Source `-1002234976277`, target
   `-1003971371667`, meter `sensor.lichilnik_pered_invertorom_napruga`, 170–280 V, 60 s.
+  170–280 V is a placeholder (the inverter's approximate UPS range from `../electricity.md`); the real limits are on the
+  offline voltage relay, and the user will set them in the options flow himself.
   - Entities: `sensor.svitlobot_last_verdict`, `button.svitlobot_send_test_message`; service `svitlobot_validator.check`.
   - State (offset, brownout flag, last verdict): `.storage/svitlobot_validator.<entry_id>`.
   - **Updating**: release (bump `manifest.json` + `pyproject.toml`), then WS `hacs/repository/download` with
