@@ -188,13 +188,15 @@ class Validator:
         if not is_outage_post(text):
             return None
 
+        # The meter before the inverter shows what the building gets; the grid sensor (the
+        # inverter's view) only decides when the meter is silent. A meter that is alive with a
+        # normal voltage means the trouble is on our side (inverter or pinger), not in the grid.
         grid = self.hass.states.get(self._grid_entity)
         voltage = self.meter_voltage()
         lines: list[str] = []
-        if grid is not None and grid.state == STATE_ON:
+        if voltage is not None and self._vmin <= voltage <= self._vmax:
             verdict = VERDICT_FALSE_ALARM
-            grid_line = f"⚠️ Мережа є: {_volts(voltage)}." if voltage is not None else "⚠️ Мережа є."
-            lines.append(f"{grid_line} Повідомлення Світлобота, ймовірно, помилкове.")
+            lines.append(f"⚠️ Мережа є: {_volts(voltage)}. Повідомлення Світлобота, ймовірно, помилкове.")
         elif voltage is not None:
             verdict = VERDICT_OUT_OF_RANGE
             lines.append("⚡ Мережа є, але її параметри поза нормою.")
@@ -202,6 +204,9 @@ class Validator:
             if range_line := await self._range_line(voltage):
                 lines.append(range_line)
             self._set_brownout(True)
+        elif grid is not None and grid.state == STATE_ON:
+            verdict = VERDICT_FALSE_ALARM
+            lines.append("⚠️ Мережа є. Повідомлення Світлобота, ймовірно, помилкове.")
         else:
             verdict = VERDICT_CONFIRMED
 
@@ -241,6 +246,4 @@ class Validator:
         # The real limits are set on an offline voltage relay, so the post doesn't quote ours.
         if voltage < self._vmin:
             return f"Напруга {_volts(voltage)} — нижча за допустиму."
-        if voltage > self._vmax:
-            return f"Напруга {_volts(voltage)} — вища за допустиму."
-        return f"Напруга {_volts(voltage)} — у допустимих межах, але наш датчик мережі її не фіксує."
+        return f"Напруга {_volts(voltage)} — вища за допустиму."

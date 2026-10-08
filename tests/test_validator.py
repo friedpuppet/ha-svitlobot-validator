@@ -86,13 +86,26 @@ async def test_high_voltage(hass: HomeAssistant, bot) -> None:
     assert "напруга тримається на рівні 291 В." in bot.sent[0][1]
 
 
-async def test_voltage_in_range_but_grid_off(hass: HomeAssistant, bot) -> None:
+async def test_meter_normal_but_inverter_off_is_false_alarm(hass: HomeAssistant, bot) -> None:
+    """The building has normal grid; the inverter (and so the grid sensor) or the pinger is at fault."""
     hass.states.async_set(GRID, "off")
     hass.states.async_set(VOLTAGE, "220")
     await setup_entry(hass, make_entry())
 
     await bot.feed(hass, [channel_post(OUTAGE)])
-    assert "Напруга 220 В — у допустимих межах, але наш датчик мережі її не фіксує." in bot.sent[0][1]
+    assert bot.sent == [(TARGET, "⚠️ Мережа є: 220 В. Повідомлення Світлобота, ймовірно, помилкове.")]
+    assert hass.states.get(VERDICT).state == "false_alarm"
+    assert hass.states.get(VERDICT).attributes["brownout"] is False
+
+
+async def test_meter_silent_but_grid_on_is_false_alarm(hass: HomeAssistant, bot, freezer) -> None:
+    hass.states.async_set(GRID, "on")
+    hass.states.async_set(VOLTAGE, "220")
+    await setup_entry(hass, make_entry())
+    freezer.tick(timedelta(seconds=61))
+
+    await bot.feed(hass, [channel_post(OUTAGE)])
+    assert bot.sent == [(TARGET, "⚠️ Мережа є. Повідомлення Світлобота, ймовірно, помилкове.")]
 
 
 async def test_real_outage_is_silent(hass: HomeAssistant, bot, freezer) -> None:

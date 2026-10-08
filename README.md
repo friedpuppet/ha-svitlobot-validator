@@ -13,11 +13,16 @@ reads the Svitlobot channel through your own bot and, for every "Світло з
   reporting, the grid is physically present. A mains-powered meter goes silent in an outage, but HA may
   keep its last value for hours, so "alive" means it reported within *Meter counts as alive for* (default 60 s).
 
-| Grid sensor | Meter | Post to the target chat |
+The meter shows what the building gets, so it decides; the grid sensor (the inverter's view) only
+matters when the meter is silent. A live meter with a normal voltage while Svitlobot reports an outage
+means the trouble is on our side (the pinger, or the inverter), not in the grid.
+
+| Meter | Grid sensor | Post to the target chat |
 |---|---|---|
-| on | — | "⚠️ Мережа є: 230 В. Повідомлення Світлобота, ймовірно, помилкове." |
-| off | alive | "⚡ Мережа є, але її параметри поза нормою." + whether the voltage is below/above the allowed range (the range itself isn't quoted: the real limits are on an offline voltage relay), and the voltage range since the grid sensor went off (read from the recorder, so it survives HA restarts) |
-| off | silent | nothing (a real outage) |
+| alive, voltage in range | — | "⚠️ Мережа є: 220 В. Повідомлення Світлобота, ймовірно, помилкове." |
+| alive, voltage out of range | — | "⚡ Мережа є, але її параметри поза нормою." + "Напруга 145 В — нижча/вища за допустиму." (the range itself isn't quoted: the real limits are on an offline voltage relay) + the voltage range since the grid sensor went off (read from the recorder, so it survives HA restarts) |
+| silent | on | "⚠️ Мережа є. Повідомлення Світлобота, ймовірно, помилкове." |
+| silent | off / unavailable | nothing (a real outage) |
 
 After a brownout post, once the grid sensor turns back on, it posts "✅ Напруга повернулася в норму: 185 В.
 Світлобот невдовзі оновить статус." If the meter goes silent first (the brownout became a real outage), that
