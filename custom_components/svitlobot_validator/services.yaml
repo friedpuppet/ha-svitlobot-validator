@@ -1,0 +1,8 @@
+check:
+  fields:
+    text:
+      required: true
+      example: "🔴 14:12 Світло зникло"
+      selector:
+        text:
+          multiline: true
