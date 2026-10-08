@@ -1,0 +1,102 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Svitlobot Validator",
+        "description": "Watch a Svitlobot Telegram channel and, when it reports a power outage, check it against a local grid sensor and a voltage meter powered from the grid. The verdict is posted to another chat. The bot must be an admin of both chats.",
+        "data": {
+          "name": "Name",
+          "token": "Bot token",
+          "source_chat": "Svitlobot channel",
+          "target_chat": "Post verdicts to",
+          "grid_entity": "Grid sensor",
+          "voltage_entity": "Grid voltage meter",
+          "voltage_min": "Lowest acceptable voltage",
+          "voltage_max": "Highest acceptable voltage",
+          "fresh_seconds": "Meter counts as alive for"
+        },
+        "data_description": {
+          "token": "From @BotFather. The bot reads the Svitlobot channel and posts the verdicts.",
+          "source_chat": "Chat id (-100…) or @username of the channel Svitlobot posts to.",
+          "target_chat": "Chat id (-100…) or @username of the chat that gets the verdicts.",
+          "grid_entity": "Binary sensor that is on while the grid is present (as the inverter sees it).",
+          "voltage_entity": "Voltage of a meter powered straight from the grid (e.g. before the inverter). While it keeps reporting, the grid is physically there.",
+          "voltage_min": "Usually the inverter's lowest accepted grid voltage.",
+          "voltage_max": "Usually the inverter's highest accepted grid voltage.",
+          "fresh_seconds": "The meter is considered powered while its last report is at most this old."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Telegram rejected the bot token.",
+      "cannot_connect": "Could not reach Telegram.",
+      "chat_not_found": "The bot can't see this chat. Add it to the chat (as an admin for channels).",
+      "same_chat": "Use a different chat than the Svitlobot channel.",
+      "bad_range": "Must be higher than the lowest acceptable voltage."
+    },
+    "abort": {
+      "already_configured": "This Svitlobot channel is already watched."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "source_chat": "Svitlobot channel",
+          "target_chat": "Post verdicts to",
+          "grid_entity": "Grid sensor",
+          "voltage_entity": "Grid voltage meter",
+          "voltage_min": "Lowest acceptable voltage",
+          "voltage_max": "Highest acceptable voltage",
+          "fresh_seconds": "Meter counts as alive for"
+        },
+        "data_description": {
+          "source_chat": "Chat id (-100…) or @username of the channel Svitlobot posts to.",
+          "target_chat": "Chat id (-100…) or @username of the chat that gets the verdicts.",
+          "grid_entity": "Binary sensor that is on while the grid is present (as the inverter sees it).",
+          "voltage_entity": "Voltage of a meter powered straight from the grid (e.g. before the inverter). While it keeps reporting, the grid is physically there.",
+          "voltage_min": "Usually the inverter's lowest accepted grid voltage.",
+          "voltage_max": "Usually the inverter's highest accepted grid voltage.",
+          "fresh_seconds": "The meter is considered powered while its last report is at most this old."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Telegram rejected the bot token.",
+      "cannot_connect": "Could not reach Telegram.",
+      "chat_not_found": "The bot can't see this chat. Add it to the chat (as an admin for channels).",
+      "same_chat": "Use a different chat than the Svitlobot channel.",
+      "bad_range": "Must be higher than the lowest acceptable voltage."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "last_verdict": {
+        "name": "Last verdict",
+        "state": {
+          "none": "None yet",
+          "false_alarm": "False alarm",
+          "out_of_range": "Grid out of range",
+          "confirmed": "Outage confirmed"
+        }
+      }
+    },
+    "button": {
+      "test_message": {
+        "name": "Send test message"
+      }
+    }
+  },
+  "services": {
+    "check": {
+      "name": "Check post",
+      "description": "Check a text as if Svitlobot had posted it (for testing). The verdict is posted to the target chat as usual.",
+      "fields": {
+        "text": {
+          "name": "Text",
+          "description": "Post text, e.g. \"🔴 14:12 Світло зникло\"."
+        }
+      }
+    }
+  }
+}
