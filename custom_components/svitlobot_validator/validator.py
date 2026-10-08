@@ -205,11 +205,7 @@ class Validator:
         else:
             verdict = VERDICT_CONFIRMED
 
-        message = None
-        if lines:
-            if link:
-                lines.append(f"Джерело: {link}")
-            message = "\n".join(lines)
+        message = "\n".join(lines) if lines else None
 
         self._persisted.data["last"] = {
             "verdict": verdict,
@@ -242,9 +238,9 @@ class Validator:
         return f"Від {start} напруга коливається в межах {low:.0f}–{_volts(high)}."
 
     def _voltage_detail(self, voltage: float) -> str:
-        allowed = f"{self._vmin:.0f}–{self._vmax:.0f} В"
+        # The real limits are set on an offline voltage relay, so the post doesn't quote ours.
         if voltage < self._vmin:
-            return f"Напруга {_volts(voltage)} — нижча за допустиму ({allowed})."
+            return f"Напруга {_volts(voltage)} — нижча за допустиму."
         if voltage > self._vmax:
-            return f"Напруга {_volts(voltage)} — вища за допустиму ({allowed})."
-        return f"Напруга {_volts(voltage)} — у допустимих межах ({allowed}), але наш датчик мережі її не фіксує."
+            return f"Напруга {_volts(voltage)} — вища за допустиму."
+        return f"Напруга {_volts(voltage)} — у допустимих межах, але наш датчик мережі її не фіксує."

@@ -25,8 +25,7 @@ async def test_false_alarm_when_grid_is_on(hass: HomeAssistant, bot) -> None:
     assert bot.sent == [
         (
             TARGET,
-            "⚠️ Мережа є: 226 В. Повідомлення Світлобота, ймовірно, помилкове.\n"
-            f"Джерело: {LINK}",
+            "⚠️ Мережа є: 226 В. Повідомлення Світлобота, ймовірно, помилкове.",
         )
     ]
     state = hass.states.get(VERDICT)
@@ -56,9 +55,8 @@ async def test_brownout_reported_then_back_to_normal(hass: HomeAssistant, bot, f
         (
             TARGET,
             "⚡ Мережа є, але її параметри поза нормою.\n"
-            "Напруга 145 В — нижча за допустиму (170–280 В).\n"
-            f"Від {since} напруга коливається в межах 140–177 В.\n"
-            f"Джерело: {LINK}",
+            "Напруга 145 В — нижча за допустиму.\n"
+            f"Від {since} напруга коливається в межах 140–177 В.",
         )
     ]
     assert hass.states.get(VERDICT).state == "out_of_range"
@@ -83,7 +81,7 @@ async def test_high_voltage(hass: HomeAssistant, bot) -> None:
     await setup_entry(hass, make_entry())
 
     await bot.feed(hass, [channel_post(OUTAGE)])
-    assert "Напруга 291 В — вища за допустиму (170–280 В)." in bot.sent[0][1]
+    assert "Напруга 291 В — вища за допустиму." in bot.sent[0][1]
     await async_wait_recording_done(hass)
     assert "напруга тримається на рівні 291 В." in bot.sent[0][1]
 
@@ -94,7 +92,7 @@ async def test_voltage_in_range_but_grid_off(hass: HomeAssistant, bot) -> None:
     await setup_entry(hass, make_entry())
 
     await bot.feed(hass, [channel_post(OUTAGE)])
-    assert "Напруга 220 В — у допустимих межах (170–280 В), але наш датчик мережі її не фіксує." in bot.sent[0][1]
+    assert "Напруга 220 В — у допустимих межах, але наш датчик мережі її не фіксує." in bot.sent[0][1]
 
 
 async def test_real_outage_is_silent(hass: HomeAssistant, bot, freezer) -> None:
