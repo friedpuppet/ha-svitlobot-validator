@@ -16,7 +16,7 @@ reads the Svitlobot channel through your own bot and, for every "Світло з
 | Grid sensor | Meter | Post to the target chat |
 |---|---|---|
 | on | — | "⚠️ Мережа є: 230 В. Повідомлення Світлобота, ймовірно, помилкове." |
-| off | alive | "⚡ Мережа є, але її параметри поза нормою." + the voltage vs. the allowed range, and the range seen since the grid sensor went off |
+| off | alive | "⚡ Мережа є, але її параметри поза нормою." + the voltage vs. the allowed range, and the voltage range since the grid sensor went off (read from the recorder, so it survives HA restarts) |
 | off | silent | nothing (a real outage) |
 
 After a brownout post, once the grid sensor turns back on, it posts "✅ Напруга повернулася в норму: 185 В.

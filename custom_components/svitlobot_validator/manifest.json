@@ -3,10 +3,11 @@
   "name": "Svitlobot Validator",
   "codeowners": ["@friedpuppet"],
   "config_flow": true,
+  "dependencies": ["recorder"],
   "documentation": "https://github.com/friedpuppet/ha-svitlobot-validator",
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/friedpuppet/ha-svitlobot-validator/issues",
   "requirements": [],
-  "version": "0.1.2"
+  "version": "0.1.3"
 }

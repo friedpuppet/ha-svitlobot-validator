@@ -3,6 +3,7 @@
 from datetime import timedelta
 
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
+from pytest_homeassistant_custom_component.components.recorder.common import async_wait_recording_done
 
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
@@ -33,21 +34,24 @@ async def test_false_alarm_when_grid_is_on(hass: HomeAssistant, bot) -> None:
     assert state.attributes["post_link"] == LINK
 
 
-async def test_brownout_reported_then_back_to_normal(hass: HomeAssistant, bot) -> None:
+async def test_brownout_reported_then_back_to_normal(hass: HomeAssistant, bot, freezer) -> None:
     """Today's profile: the inverter dropped the grid at ~177 V, the meter saw 140–185 V."""
     hass.states.async_set(GRID, "on")
     hass.states.async_set(VOLTAGE, "186")
     await setup_entry(hass, make_entry())
 
+    freezer.tick(10)
     hass.states.async_set(VOLTAGE, "177")
+    freezer.tick(10)
     hass.states.async_set(GRID, "off")
+    since = dt_util.as_local(dt_util.utcnow()).strftime("%H:%M")
     for volts in ("166", "149", "140", "145"):
+        freezer.tick(10)
         hass.states.async_set(VOLTAGE, volts)
-    await hass.async_block_till_done()
+    await async_wait_recording_done(hass)
 
     await bot.feed(hass, [channel_post(OUTAGE)])
 
-    since = dt_util.as_local(dt_util.utcnow()).strftime("%H:%M")
     assert bot.sent == [
         (
             TARGET,
@@ -80,8 +84,8 @@ async def test_high_voltage(hass: HomeAssistant, bot) -> None:
 
     await bot.feed(hass, [channel_post(OUTAGE)])
     assert "Напруга 291 В — вища за допустиму (170–280 В)." in bot.sent[0][1]
-    since = dt_util.as_local(hass.states.get(GRID).last_changed).strftime("%H:%M")
-    assert f"Від {since} напруга тримається на рівні 291 В." in bot.sent[0][1]
+    await async_wait_recording_done(hass)
+    assert "напруга тримається на рівні 291 В." in bot.sent[0][1]
 
 
 async def test_voltage_in_range_but_grid_off(hass: HomeAssistant, bot) -> None:
@@ -200,3 +204,27 @@ async def test_brownout_dropped_if_grid_returned_while_down(hass: HomeAssistant,
     await hass.async_block_till_done()
     assert hass.states.get(VERDICT).attributes["brownout"] is False
     assert len(bot.sent) == 1
+
+
+async def test_range_comes_from_history_across_restart(hass: HomeAssistant, bot, freezer) -> None:
+    """A restart re-writes the grid state with a new last_changed; the range still starts at the real drop."""
+    hass.states.async_set(GRID, "on")
+    hass.states.async_set(VOLTAGE, "190")
+    freezer.tick(60)
+    hass.states.async_set(GRID, "off")
+    started = dt_util.as_local(dt_util.utcnow()).strftime("%H:%M")
+    hass.states.async_set(VOLTAGE, "150")
+    freezer.tick(timedelta(minutes=3))
+    hass.states.async_set(VOLTAGE, "135")
+    freezer.tick(timedelta(minutes=3))
+    # HA restart: the states come back fresh.
+    hass.states.async_set(GRID, "unavailable")
+    hass.states.async_set(VOLTAGE, "unavailable")
+    freezer.tick(30)
+    hass.states.async_set(GRID, "off")
+    hass.states.async_set(VOLTAGE, "160")
+    await async_wait_recording_done(hass)
+    await setup_entry(hass, make_entry())
+
+    await bot.feed(hass, [channel_post(OUTAGE)])
+    assert f"Від {started} напруга коливається в межах 135–190 В." in bot.sent[0][1]
