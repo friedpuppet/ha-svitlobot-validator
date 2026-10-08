@@ -1044,7 +1044,7 @@ wheels = [
 
 [[package]]
 name = "ha-svitlobot-validator"
-version = "0.1.0"
+version = "0.1.1"
 source = { virtual = "." }
 
 [package.dev-dependencies]
