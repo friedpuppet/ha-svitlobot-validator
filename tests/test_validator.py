@@ -24,8 +24,8 @@ async def test_false_alarm_when_grid_is_on(hass: HomeAssistant, bot) -> None:
     assert bot.sent == [
         (
             TARGET,
-            "⚠️ Електрика насправді є, повідомлення від Світлобота є, ймовірно, помилковим.\n"
-            f"Напруга: 226 В.\nПост Світлобота: {LINK}",
+            "⚠️ Мережа є: 226 В. Повідомлення Світлобота, ймовірно, помилкове.\n"
+            f"Джерело: {LINK}",
         )
     ]
     state = hass.states.get(VERDICT)
@@ -51,10 +51,10 @@ async def test_brownout_reported_then_back_to_normal(hass: HomeAssistant, bot) -
     assert bot.sent == [
         (
             TARGET,
-            "⚡ Електрика є, але параметри за межами допустимих.\n"
-            "Напруга 145 В — нижче допустимої (170–280 В).\n"
-            f"З {since} напруга була від 140 В до 177 В.\n"
-            f"Пост Світлобота: {LINK}",
+            "⚡ Мережа є, але її параметри поза нормою.\n"
+            "Напруга 145 В — нижча за допустиму (170–280 В).\n"
+            f"Від {since} напруга коливається в межах 140–177 В.\n"
+            f"Джерело: {LINK}",
         )
     ]
     assert hass.states.get(VERDICT).state == "out_of_range"
@@ -63,7 +63,7 @@ async def test_brownout_reported_then_back_to_normal(hass: HomeAssistant, bot) -
     hass.states.async_set(VOLTAGE, "185")
     hass.states.async_set(GRID, "on")
     await hass.async_block_till_done()
-    assert bot.sent[-1] == (TARGET, "✅ Напруга повернулась у норму: 185 В. Чекайте оновлення від Світлобота.")
+    assert bot.sent[-1] == (TARGET, "✅ Напруга повернулася в норму: 185 В. Світлобот невдовзі оновить статус.")
     assert hass.states.get(VERDICT).attributes["brownout"] is False
 
     # Only once.
@@ -79,7 +79,18 @@ async def test_high_voltage(hass: HomeAssistant, bot) -> None:
     await setup_entry(hass, make_entry())
 
     await bot.feed(hass, [channel_post(OUTAGE)])
-    assert "Напруга 291 В — вище допустимої (170–280 В)." in bot.sent[0][1]
+    assert "Напруга 291 В — вища за допустиму (170–280 В)." in bot.sent[0][1]
+    since = dt_util.as_local(hass.states.get(GRID).last_changed).strftime("%H:%M")
+    assert f"Від {since} напруга тримається на рівні 291 В." in bot.sent[0][1]
+
+
+async def test_voltage_in_range_but_grid_off(hass: HomeAssistant, bot) -> None:
+    hass.states.async_set(GRID, "off")
+    hass.states.async_set(VOLTAGE, "220")
+    await setup_entry(hass, make_entry())
+
+    await bot.feed(hass, [channel_post(OUTAGE)])
+    assert "Напруга 220 В — у допустимих межах (170–280 В), але наш датчик мережі її не фіксує." in bot.sent[0][1]
 
 
 async def test_real_outage_is_silent(hass: HomeAssistant, bot, freezer) -> None:
@@ -127,7 +138,7 @@ async def test_brownout_survives_reload(hass: HomeAssistant, bot) -> None:
     hass.states.async_set(VOLTAGE, "200")
     hass.states.async_set(GRID, "on")
     await hass.async_block_till_done()
-    assert bot.sent[-1][1].startswith("✅ Напруга повернулась у норму: 200 В.")
+    assert bot.sent[-1][1].startswith("✅ Напруга повернулася в норму: 200 В.")
 
 
 async def test_other_posts_ignored(hass: HomeAssistant, bot) -> None:
@@ -169,7 +180,7 @@ async def test_check_service_and_test_button(hass: HomeAssistant, bot) -> None:
         DOMAIN, "check", {"text": OUTAGE}, blocking=True, return_response=True
     )
     assert response == {"verdicts": ["false_alarm"]}
-    assert bot.sent[-1][1] == "⚠️ Електрика насправді є, повідомлення від Світлобота є, ймовірно, помилковим."
+    assert bot.sent[-1][1] == "⚠️ Мережа є. Повідомлення Світлобота, ймовірно, помилкове."
 
     await hass.services.async_call("button", "press", {"entity_id": "button.svitlobot_send_test_message"}, blocking=True)
     assert bot.sent[-1] == (TARGET, "🧪 Тестове повідомлення від Svitlobot Validator")
