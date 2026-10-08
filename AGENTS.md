@@ -37,7 +37,7 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
 
 ## Status
 
-- Code and tests are done (`uv run pytest -q`). Version **0.1.4**.
+- Code and tests are done (`uv run pytest -q`). Version **0.1.5**.
 - **Installed on the live HA (2026-10-08)** via HACS custom repository (HACS repo id `1410267100`), entry «Світлобот»
   `01M4DQ0BMA0749WWZGGW8ZZQXA` (created through the config flow REST API). Source `-1002234976277`, target
   `-1003971371667`, grid `binary_sensor.e_elektrika`, meter `sensor.lichilnik_pered_invertorom_napruga`, 170–280 V, 60 s.
@@ -55,6 +55,11 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
   - Since v0.1.4 the posts carry no link to the Svitlobot post and don't quote the 170–280 V range ("нижча/вища за
     допустиму" only): the real limits are set on an offline voltage relay that HA can't see (the user's call). The
     range options still decide below/above/within; `post_link` stays a sensor attribute.
+  - **Meter first** since v0.1.5 (the user's call): `e_elektrika` is the *inverter's* view (inverter grid voltage >
+    170 V, pinger as fallback; the meter isn't in that chain). Meter alive + in range → false alarm even with
+    `e_elektrika` off (the inverter or the pinger is at fault, not the grid); meter alive + out of range → brownout
+    post; meter silent → `e_elektrika` on = false alarm without voltage, otherwise silent. Inverter/pinger trouble
+    isn't the channel's business; a separate private alert could be added later.
   - Verified live 2026-10-08: polling works (offset stored), the test button and `check` (→ `false_alarm`) post into
     the test channel. The brownout and back-to-normal branches haven't been seen live yet.
 - Repo: **friedpuppet/ha-svitlobot-validator** (public, for HACS only; same "personal project" rules and PAT
