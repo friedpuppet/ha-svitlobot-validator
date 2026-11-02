@@ -84,8 +84,6 @@ async def _validate(hass: HomeAssistant, token: str, user_input: dict[str, Any],
             errors[key] = "chat_not_found"
         else:
             options[key] = chat["id"]
-    if not errors and options[CONF_SOURCE_CHAT] == options[CONF_TARGET_CHAT]:
-        errors[CONF_TARGET_CHAT] = "same_chat"
     if options[CONF_VOLTAGE_MIN] >= options[CONF_VOLTAGE_MAX]:
         errors[CONF_VOLTAGE_MAX] = "bad_range"
     return options

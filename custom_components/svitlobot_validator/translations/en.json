@@ -33,7 +33,6 @@
       "invalid_auth": "Telegram rejected the bot token.",
       "cannot_connect": "Could not reach Telegram.",
       "chat_not_found": "The bot can't see this chat. Add it to the chat (as an admin for channels).",
-      "same_chat": "Use a different chat than the Svitlobot channel.",
       "bad_range": "Must be higher than the lowest acceptable voltage."
     },
     "abort": {
@@ -69,7 +68,6 @@
       "invalid_auth": "Telegram rejected the bot token.",
       "cannot_connect": "Could not reach Telegram.",
       "chat_not_found": "The bot can't see this chat. Add it to the chat (as an admin for channels).",
-      "same_chat": "Use a different chat than the Svitlobot channel.",
       "bad_range": "Must be higher than the lowest acceptable voltage."
     }
   },

@@ -75,14 +75,22 @@ async def test_user_flow_errors(hass: HomeAssistant, bot) -> None:
     assert result["errors"] == {CONF_TARGET_CHAT: "chat_not_found"}
 
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {**USER_INPUT, CONF_TARGET_CHAT: str(SOURCE)}
-    )
-    assert result["errors"] == {CONF_TARGET_CHAT: "same_chat"}
-
-    result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {**USER_INPUT, CONF_VOLTAGE_MIN: 300}
     )
     assert result["errors"] == {CONF_VOLTAGE_MAX: "bad_range"}
+
+
+async def test_options_flow_allows_posting_into_the_source_channel(hass: HomeAssistant, bot) -> None:
+    entry = make_entry()
+    await setup_entry(hass, entry)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    options = {k: v for k, v in USER_INPUT.items() if k not in ("name", CONF_TOKEN)}
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**options, CONF_TARGET_CHAT: str(SOURCE)}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_TARGET_CHAT] == SOURCE
 
 
 async def test_options_flow(hass: HomeAssistant, bot) -> None:
