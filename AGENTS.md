@@ -65,6 +65,7 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
   - Brownout start = first out-of-range meter reading after the last normal one (recorder, `unavailable` gaps
     skipped). The "back to normal" summary is sent when Svitlobot posts «Світло з'явилося» (the user's call), with
     "З HH:MM до HH:MM напруга була поза нормою: lo–hi В".
+  - **The test button and `check` now post into the live channel**: switch the target back to the test channel first.
   - Verified live 2026-10-08: polling works (offset stored), the test button and `check` (→ `false_alarm`) post into
     the test channel. The brownout and back-to-normal branches haven't been seen live yet.
 - Repo: **friedpuppet/ha-svitlobot-validator** (public, for HACS only; same "personal project" rules and PAT
