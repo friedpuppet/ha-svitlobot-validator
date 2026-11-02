@@ -19,8 +19,8 @@ Read `../AGENTS.md` (host, SSH, API token, backups), `../electricity.md` (grid s
 - Chats:
   | Chat | Id | Role |
   |---|---|---|
-  | СвітлоБот ⚡ Київ, Дашкевича, 4 (`@svitlobot_kyiv_dashkevycha_4`) | `-1002234976277` | **source**: Svitlobot posts here. **Never post here** without the user's explicit go-ahead |
-  | Тест для світлобота | `-1003971371667` | **target** for now: every verdict and test goes here |
+  | СвітлоБот ⚡ Київ, Дашкевича, 4 (`@svitlobot_kyiv_dashkevycha_4`) | `-1002234976277` | **source and target** since v0.2.1 (2026-11-02, the user's go-ahead): Svitlobot posts here, and so do the verdicts. Tests don't belong here |
+  | Тест для світлобота | `-1003971371667` | the target until 2026-11-02, now for manual tests only |
   | s4_svitlo_test (`@d4_svitlo_test`) | `-1003716931187` | the user's older test channel, unused |
 - A bot never receives its own posts. To test, use the `svitlobot_validator.check` service, or have the user post into
   the source channel.
@@ -37,10 +37,10 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
 
 ## Status
 
-- Code and tests are done (`uv run pytest -q`). Version **0.2.0**.
+- Code and tests are done (`uv run pytest -q`). Version **0.2.1** (dropped the `same_chat` check: a bot never gets its own posts).
 - **Installed on the live HA (2026-10-08)** via HACS custom repository (HACS repo id `1410267100`), entry «Світлобот»
-  `01M4DQ0BMA0749WWZGGW8ZZQXA` (created through the config flow REST API). Source `-1002234976277`, target
-  `-1003971371667`, meter `sensor.lichilnik_pered_invertorom_napruga`, 170–280 V, 60 s.
+  `01M4DQ0BMA0749WWZGGW8ZZQXA` (created through the config flow REST API). Source and target `-1002234976277` (target was
+  `-1003971371667` until 2026-11-02), meter `sensor.lichilnik_pered_invertorom_napruga`, 170–280 V, 60 s.
   170–280 V is a placeholder (the inverter's approximate UPS range from `../electricity.md`); the real limits are on the
   offline voltage relay, and the user will set them in the options flow himself.
   - Entities: `sensor.svitlobot_last_verdict`, `button.svitlobot_send_test_message`; service `svitlobot_validator.check`.
