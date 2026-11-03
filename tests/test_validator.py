@@ -153,20 +153,104 @@ async def test_real_outage_is_silent(hass: HomeAssistant, bot, freezer) -> None:
     assert hass.states.get(VERDICT).state == "confirmed"
 
 
-async def test_brownout_turning_into_outage_skips_summary(hass: HomeAssistant, bot, freezer) -> None:
+async def tick(hass: HomeAssistant, freezer, seconds: float) -> None:
+    """Let time pass and run the watch's timer."""
+    freezer.tick(timedelta(seconds=seconds))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    await async_wait_recording_done(hass)  # the check reads the meter's history in the recorder's thread
+    await hass.async_block_till_done()
+
+
+async def start_brownout_then_lose_the_meter(hass: HomeAssistant, bot, freezer) -> tuple[str, str]:
+    """A reported brownout at 150 V, then the meter goes silent: the outage post."""
     hass.states.async_set(VOLTAGE, "150")
+    started = hhmm()
     await setup_entry(hass, make_entry())
     await bot.feed(hass, [channel_post(OUTAGE)])
     assert len(bot.sent) == 1
 
-    freezer.tick(timedelta(seconds=90))
-    async_fire_time_changed(hass)
-    await hass.async_block_till_done()
-    assert hass.states.get(VERDICT).attributes["brownout"] is False
+    await tick(hass, freezer, 90)
+    return started, started  # the stretch started, and the meter last reported, at the same moment
 
+
+async def test_brownout_turning_into_outage_is_posted_once(hass: HomeAssistant, bot, freezer) -> None:
+    started, lost = await start_brownout_then_lose_the_meter(hass, bot, freezer)
+    assert bot.sent[1] == (
+        TARGET,
+        f"🔴 Мережа зникла о {lost}.\nПеред тим з {started} напруга була поза нормою: 150 В.",
+    )
+    attributes = hass.states.get(VERDICT).attributes
+    assert attributes["brownout"] is False
+    assert attributes["outage_since"] is not None
+
+    for _ in range(3):
+        await tick(hass, freezer, 30)
+    assert len(bot.sent) == 2
+
+    # Svitlobot's own all-clear is right after a real outage: nothing to add.
     hass.states.async_set(VOLTAGE, "225")
     await bot.feed(hass, [channel_post(RESTORED)])
+    assert len(bot.sent) == 2
+    assert hass.states.get(VERDICT).attributes["outage_since"] is None
+
+
+async def test_outage_then_back_out_of_range(hass: HomeAssistant, bot, freezer) -> None:
+    """The relay keeps the line off, so the pinger and Svitlobot stay silent: we say the grid is back."""
+    await start_brownout_then_lose_the_meter(hass, bot, freezer)
+    await tick(hass, freezer, 600)
+
+    hass.states.async_set(VOLTAGE, "160")
+    back = hhmm()
+    await tick(hass, freezer, 30)
+    assert bot.sent[2] == (
+        TARGET,
+        f"⚡ Мережа повернулась о {back}, але напруга поза нормою.\nНапруга 160 В — нижча за допустиму.",
+    )
+    attributes = hass.states.get(VERDICT).attributes
+    assert attributes["brownout"] is True
+    assert attributes["outage_since"] is None
+
+    await tick(hass, freezer, 30)
+    assert len(bot.sent) == 3
+
+    hass.states.async_set(VOLTAGE, "200")
+    ended = hhmm()
+    freezer.tick(30)  # Svitlobot posts a little later
+    await async_wait_recording_done(hass)
+    await bot.feed(hass, [channel_post(RESTORED)])
+    assert bot.sent[3] == (
+        TARGET,
+        f"✅ Напруга в нормі: 200 В.\nЗ {back} до {ended} напруга була поза нормою: 160 В.",
+    )
+
+
+async def test_outage_then_back_in_range_is_silent(hass: HomeAssistant, bot, freezer) -> None:
+    await start_brownout_then_lose_the_meter(hass, bot, freezer)
+
+    hass.states.async_set(VOLTAGE, "225")
+    await tick(hass, freezer, 30)
+    assert len(bot.sent) == 2
+    attributes = hass.states.get(VERDICT).attributes
+    assert attributes["brownout"] is False
+    assert attributes["outage_since"] is None
+
+
+async def test_no_outage_post_right_after_a_restart(hass: HomeAssistant, bot, freezer) -> None:
+    """After a reload the meter needs a moment to report; a stale reading then isn't an outage yet."""
+    hass.states.async_set(VOLTAGE, "150")
+    entry = make_entry()
+    await setup_entry(hass, entry)
+    await bot.feed(hass, [channel_post(OUTAGE)])
+
+    freezer.tick(timedelta(seconds=61))
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    await tick(hass, freezer, 30)
     assert len(bot.sent) == 1
+
+    await tick(hass, freezer, 40)
+    assert bot.sent[1][1].startswith("🔴 Мережа зникла о ")
 
 
 async def test_brownout_survives_reload(hass: HomeAssistant, bot) -> None:

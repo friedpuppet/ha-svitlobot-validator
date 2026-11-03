@@ -46,6 +46,7 @@ class LastVerdictSensor(ValidatorEntity, SensorEntity):
             "voltage": last.get("voltage"),
             "message": last.get("message"),
             "brownout": self._validator.brownout,
+            "outage_since": (since := self._validator.outage_since) and since.isoformat(),
         }
 
     async def async_added_to_hass(self) -> None:
