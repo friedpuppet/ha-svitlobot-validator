@@ -37,7 +37,10 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
 
 ## Status
 
-- Code and tests are done (`uv run pytest -q`). Version **0.2.1** (dropped the `same_chat` check: a bot never gets its own posts).
+- Code and tests are done (`uv run pytest -q`). Version **0.3.0**: after a reported brownout the meter is watched until Svitlobot's «з'явилося» (v0.3.0, 2026-11-03, the
+  user's call). If it goes silent: «🔴 Мережа зникла о HH:MM» + the brownout's range; if it then comes back out of
+  range: «⚡ Мережа повернулась…». Store keys `brownout_since` / `outage_since`; sensor attribute `outage_since`.
+  v0.2.1 dropped the `same_chat` check: a bot never gets its own posts.
 - **Installed on the live HA (2026-10-08)** via HACS custom repository (HACS repo id `1410267100`), entry «Світлобот»
   `01M4DQ0BMA0749WWZGGW8ZZQXA` (created through the config flow REST API). Source and target `-1002234976277` (target was
   `-1003971371667` until 2026-11-02), meter `sensor.lichilnik_pered_invertorom_napruga`, 170–280 V, 60 s.

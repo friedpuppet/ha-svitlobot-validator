@@ -26,6 +26,18 @@ The allowed range itself isn't quoted in the posts: the real limits are on an of
 start of a brownout is the first out-of-range reading after the last normal one, read from the recorder,
 so it survives HA restarts.
 
+**After a reported brownout the meter is watched** (every 30 s) until Svitlobot posts «Світло з'явилося»:
+
+- the meter goes silent (a real outage now; Svitlobot has nothing new to say, so the channel would still read "the
+  grid is there"): "🔴 Мережа зникла о 09:31." + "Перед тим з 09:00 напруга була поза нормою: 251–263 В.";
+- after that the meter comes back but out of range (a voltage relay keeps the line off, so the pinger and Svitlobot
+  stay silent): "⚡ Мережа повернулась о 09:40, але напруга поза нормою." + "Напруга 255 В — вища за допустиму.".
+  The brownout is watched again from there;
+- the meter comes back in range: nothing; Svitlobot's own «Світло з'явилося» will be right.
+
+Silence means no report for *Meter counts as alive for*, so the outage post comes 1–1.5 min late. Nothing is decided
+in the first *Meter counts as alive for* after HA starts, while the meter hasn't reported yet.
+
 **"🟢 … Світло з'явилося" after a reported brownout**: "✅ Напруга в нормі: 185 В." + "З 14:12 до 14:31
 напруга була поза нормою: 140–166 В." (or "⚡ Напруга досі поза нормою: …" if it still is). If the meter went
 silent in between (the brownout became a real outage), nothing is posted.

@@ -29,7 +29,7 @@ _LOGGER = logging.getLogger(__name__)
 OUTAGE_RE = re.compile(r"Світло\s+зникло", re.IGNORECASE)
 RESTORED_RE = re.compile(r"Світло\s+з\W?явилося", re.IGNORECASE)
 
-STALE_CHECK_INTERVAL = timedelta(seconds=30)
+WATCH_INTERVAL = timedelta(seconds=30)
 # How far back to look for the start of the current brownout.
 HISTORY_LOOKBACK = timedelta(hours=24)
 
@@ -106,28 +106,44 @@ class Validator:
         self._send = send
         self._send_owner = send_owner
         self._listeners: list[CALLBACK_TYPE] = []
-        self._unsub_stale: CALLBACK_TYPE | None = None
+        self._unsub_watch: CALLBACK_TYPE | None = None
+        self._started = dt_util.utcnow()
 
     # --- persisted state -------------------------------------------------
 
+    # The watch after a reported brownout, until Svitlobot says the power is back:
+    #   brownout: the meter is alive but out of range (``brownout_since``);
+    #   outage:   the brownout turned into a real outage (``outage_since``, the last meter reading).
+
+    def _time(self, key: str) -> datetime | None:
+        value = self._persisted.data.get(key)
+        return dt_util.parse_datetime(value) if value else None
+
     @property
     def brownout_since(self) -> datetime | None:
-        """Set while a brownout was reported and Svitlobot hasn't said the power is back."""
-        value = self._persisted.data.get("brownout_since")
-        return dt_util.parse_datetime(value) if value else None
+        return self._time("brownout_since")
+
+    @property
+    def outage_since(self) -> datetime | None:
+        return self._time("outage_since")
 
     @property
     def brownout(self) -> bool:
         return self.brownout_since is not None
 
-    def _set_brownout(self, since: datetime | None) -> None:
-        self._persisted.data["brownout_since"] = since.isoformat() if since else None
+    @property
+    def watching(self) -> bool:
+        return self.brownout_since is not None or self.outage_since is not None
+
+    def _set_watch(self, *, brownout_since: datetime | None = None, outage_since: datetime | None = None) -> None:
+        self._persisted.data["brownout_since"] = brownout_since.isoformat() if brownout_since else None
+        self._persisted.data["outage_since"] = outage_since.isoformat() if outage_since else None
         self._persisted.async_schedule_save()
-        if since and self._unsub_stale is None:
-            self._unsub_stale = async_track_time_interval(self.hass, self._stale_check, STALE_CHECK_INTERVAL)
-        elif not since and self._unsub_stale is not None:
-            self._unsub_stale()
-            self._unsub_stale = None
+        if self.watching and self._unsub_watch is None:
+            self._unsub_watch = async_track_time_interval(self.hass, self._watch_check, WATCH_INTERVAL)
+        elif not self.watching and self._unsub_watch is not None:
+            self._unsub_watch()
+            self._unsub_watch = None
         self._notify()
 
     @property
@@ -138,14 +154,15 @@ class Validator:
 
     @callback
     def async_start(self) -> None:
-        if self.brownout:
-            self._set_brownout(self.brownout_since)  # restart the stale check
+        self._started = dt_util.utcnow()
+        if self.watching:  # restart the watch
+            self._set_watch(brownout_since=self.brownout_since, outage_since=self.outage_since)
 
     @callback
     def async_stop(self) -> None:
-        if self._unsub_stale is not None:
-            self._unsub_stale()
-            self._unsub_stale = None
+        if self._unsub_watch is not None:
+            self._unsub_watch()
+            self._unsub_watch = None
 
     @callback
     def async_add_listener(self, listener: CALLBACK_TYPE) -> CALLBACK_TYPE:
@@ -181,11 +198,51 @@ class Validator:
             _LOGGER.exception("Could not read the meter history")
             return []
 
-    @callback
-    def _stale_check(self, _now: datetime) -> None:
-        """The meter went silent: a real outage now, so no "back to normal" post."""
-        if self.meter_voltage() is None:
-            self._set_brownout(None)
+    def _last_reading_time(self) -> datetime:
+        """When the meter last reported (it may already be ``unavailable``)."""
+        state = self.hass.states.get(self._voltage_entity)
+        if state is not None and _float(state.state) is not None:
+            return state.last_reported
+        return dt_util.utcnow()
+
+    async def _watch_check(self, _now: datetime) -> None:
+        """Follow a reported brownout: tell the channel if it becomes a real outage, or comes back out of range."""
+        if (dt_util.utcnow() - self._started).total_seconds() < self._fresh:
+            return  # just started: the meter may simply not have reported yet
+        voltage = self.meter_voltage()
+        if (since := self.brownout_since) is not None and voltage is None:
+            when = max(self._last_reading_time(), since)
+            self._set_watch(outage_since=when)  # before awaiting: a second tick must not post again
+            bad, _ = await self._bad_stretch(since)
+            lines = [f"🔴 Мережа зникла о {_hhmm(when)}."]
+            if bad:
+                lines.append(f"Перед тим з {_hhmm(since)} напруга була поза нормою: {_span(bad)}.")
+            _LOGGER.info("The reported brownout turned into an outage at %s", when)
+            await self._send("\n".join(lines))
+        elif self.outage_since is not None and voltage is not None:
+            if self._in_range(voltage):
+                self._set_watch()  # the power is back and fine; Svitlobot will say so itself
+                return
+            state = self.hass.states.get(self._voltage_entity)
+            back = min(state.last_reported, dt_util.utcnow()) if state else dt_util.utcnow()
+            self._set_watch(brownout_since=back)
+            _LOGGER.info("The meter is back at %s V, still out of range", voltage)
+            await self._send(
+                f"⚡ Мережа повернулась о {_hhmm(back)}, але напруга поза нормою.\n{self._voltage_detail(voltage)}"
+            )
+
+    async def _bad_stretch(self, since: datetime) -> tuple[list[float], datetime | None]:
+        """Out-of-range readings from ``since`` to the last one, and when the stretch ended (the next good reading)."""
+        # A second early, so the reading that sits exactly on ``since`` is a change and not the start state;
+        # the start state (stamped with the period's start) is the reading before ``since`` and is dropped.
+        history = await self._history(since - timedelta(seconds=1))
+        readings = [(when, value) for when, value in history if value is not None and when >= since]
+        last_bad = max((i for i, (_, v) in enumerate(readings) if not self._in_range(v)), default=None)
+        if last_bad is None:
+            return [], None
+        bad = [v for _, v in readings[: last_bad + 1] if not self._in_range(v)]
+        end = readings[last_bad + 1][0] if last_bad + 1 < len(readings) else None
+        return bad, end
 
     # --- the checks -------------------------------------------------------
 
@@ -195,12 +252,15 @@ class Validator:
             return await self._check_outage(link)
         if is_restored_post(text) and self.brownout:
             return await self._back_to_normal()
+        if is_restored_post(text) and self.watching:
+            self._set_watch()  # after a real outage Svitlobot is right: nothing to add
         return None
 
     async def _check_outage(self, link: str | None) -> str:
         voltage = self.meter_voltage()
         lines: list[str] = []
         owner_message = None
+        self._set_watch()  # a new post starts over
         if voltage is None:
             verdict = VERDICT_CONFIRMED
         elif self._in_range(voltage):
@@ -213,7 +273,7 @@ class Validator:
             lines.append(self._voltage_detail(voltage))
             since, values = await self._brownout_readings(voltage)
             lines.append(f"Від {_hhmm(since)} напруга коливається {_range_text(values)}.")
-            self._set_brownout(since)
+            self._set_watch(brownout_since=since)
 
         message = "\n".join(lines) if lines else None
         self._persisted.data["last"] = {
@@ -249,21 +309,12 @@ class Validator:
     async def _back_to_normal(self) -> str | None:
         """Svitlobot says the power is back after a reported brownout: sum it up."""
         since = self.brownout_since
-        self._set_brownout(None)
+        self._set_watch()
         voltage = self.meter_voltage()
         if voltage is None or since is None:
             return None  # the meter is silent: it became a real outage meanwhile
 
-        # The stretch ends at the first good reading after the last bad one.
-        # A second early: the reading that opened the stretch sits exactly on ``since``.
-        history_start = since - timedelta(seconds=1)
-        readings = [(when, value) for when, value in await self._history(history_start) if value is not None]
-        last_bad = max((i for i, (_, v) in enumerate(readings) if not self._in_range(v)), default=None)
-        if last_bad is None:
-            bad, end = [], None
-        else:
-            bad = [v for _, v in readings[: last_bad + 1] if not self._in_range(v)]
-            end = readings[last_bad + 1][0] if last_bad + 1 < len(readings) else None
+        bad, end = await self._bad_stretch(since)
 
         lines = []
         if self._in_range(voltage):
