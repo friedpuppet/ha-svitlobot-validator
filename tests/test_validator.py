@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
 from custom_components.svitlobot_validator.const import DOMAIN
+from custom_components.svitlobot_validator.validator import post_time
 
 from .conftest import (
     OUTAGE,
@@ -61,6 +62,101 @@ async def test_false_alarm_with_pinger_online(hass: HomeAssistant, bot) -> None:
 
     await bot.feed(hass, [channel_post(OUTAGE)])
     assert bot.sent[1][1].endswith("Пінгер на зв'язку — схоже, збій Світлобота.")
+
+
+async def test_false_alarm_then_real_outage(hass: HomeAssistant, bot, freezer) -> None:
+    """2026-11-08: the grid came back for a minute as Svitlobot posted, then went for good."""
+    hass.states.async_set(VOLTAGE, "185")
+    lost = hhmm()
+    await setup_entry(hass, make_entry(owner_chat=None))
+    await bot.feed(hass, [channel_post(OUTAGE)])
+    assert bot.sent == [(TARGET, "⚠️ Мережа є: 185 В. Повідомлення Світлобота, ймовірно, помилкове.")]
+    assert hass.states.get(VERDICT).attributes["alive_since"] is not None
+
+    await tick(hass, freezer, 90)
+    assert bot.sent[1] == (TARGET, f"🔴 Мережа зникла о {lost}.")
+    await tick(hass, freezer, 30)
+    assert len(bot.sent) == 2
+
+    hass.states.async_set(VOLTAGE, "225")
+    await bot.feed(hass, [channel_post(RESTORED)])
+    assert len(bot.sent) == 2
+    attributes = hass.states.get(VERDICT).attributes
+    assert attributes["alive_since"] is None
+    assert attributes["outage_since"] is None
+
+
+def outage_at(when: str) -> str:
+    return f"🔴 {when} Світло зникло\n🕓 Воно було 6год 2хв"
+
+
+async def test_voltage_back_in_range_just_before_the_post(hass: HomeAssistant, bot, freezer) -> None:
+    """2026-11-08 09:13:44: 185 V at the check, but 174–184 V since the time Svitlobot gave."""
+    hass.states.async_set(VOLTAGE, "190")
+    reported = hhmm()
+    freezer.tick(40)
+    hass.states.async_set(VOLTAGE, "184")
+    started = hhmm()
+    for volts in ("178", "174", "180"):
+        freezer.tick(60)
+        hass.states.async_set(VOLTAGE, volts)
+    freezer.tick(60)
+    hass.states.async_set(VOLTAGE, "185")
+    await async_wait_recording_done(hass)
+    await setup_entry(hass, make_entry(voltage_min=185, voltage_max=250))  # the live limits
+
+    await bot.feed(hass, [channel_post(outage_at(reported))])
+    assert bot.sent == [
+        (
+            TARGET,
+            "⚡ Мережа є, але її параметри були поза нормою.\n"
+            f"Зараз напруга 185 В, а від {started} вона опускалася до 174 В.",
+        )
+    ]  # no private note: nothing went wrong on our side
+    state = hass.states.get(VERDICT)
+    assert state.state == "out_of_range"
+    assert state.attributes["brownout"] is True
+
+    await tick(hass, freezer, 90)  # then the grid goes for good
+    assert bot.sent[1][1].endswith(f"Перед тим з {started} напруга була поза нормою: 174–184 В.")
+
+
+async def test_old_out_of_range_readings_dont_count(hass: HomeAssistant, bot, freezer) -> None:
+    """Only readings since the time Svitlobot gave count; an earlier sag is a different story."""
+    hass.states.async_set(VOLTAGE, "150")
+    freezer.tick(timedelta(minutes=10))
+    hass.states.async_set(VOLTAGE, "226")
+    freezer.tick(timedelta(minutes=2))
+    reported = hhmm()
+    freezer.tick(timedelta(minutes=4))
+    hass.states.async_set(VOLTAGE, "225")
+    await async_wait_recording_done(hass)
+    await setup_entry(hass, make_entry(owner_chat=None))
+
+    await bot.feed(hass, [channel_post(outage_at(reported))])
+    assert bot.sent == [(TARGET, "⚠️ Мережа є: 225 В. Повідомлення Світлобота, ймовірно, помилкове.")]
+
+
+def test_post_time() -> None:
+    now = dt_util.as_utc(dt_util.as_local(dt_util.utcnow()).replace(hour=9, minute=13, second=44))
+    local = lambda when: dt_util.as_local(when).strftime("%d %H:%M")
+    today = dt_util.as_local(now).strftime("%d")
+    assert local(post_time("🔴 09:09 Світло зникло", now)) == f"{today} 09:09"
+    assert post_time("🔴 08:30 Світло зникло", now) is None  # too long ago to trust
+    assert post_time("Світло зникло", now) is None
+    midnight = dt_util.as_utc(dt_util.as_local(now).replace(hour=0, minute=2))
+    assert local(post_time("🔴 23:58 Світло зникло", midnight)).endswith("23:58")
+
+
+async def test_false_alarm_watch_ends_with_svitlobot_all_clear(hass: HomeAssistant, bot, freezer) -> None:
+    hass.states.async_set(VOLTAGE, "226")
+    await setup_entry(hass, make_entry(owner_chat=None))
+    await bot.feed(hass, [channel_post(OUTAGE)])
+    await bot.feed(hass, [channel_post(RESTORED)])
+    assert hass.states.get(VERDICT).attributes["alive_since"] is None
+
+    await tick(hass, freezer, 120)  # the meter goes quiet later: nothing is watched any more
+    assert len(bot.sent) == 1
 
 
 async def test_no_owner_configured(hass: HomeAssistant, bot) -> None:

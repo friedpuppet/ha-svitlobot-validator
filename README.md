@@ -22,14 +22,21 @@ grid problem.
 | alive, voltage out of range | "⚡ Мережа є, але її параметри поза нормою." + "Напруга 145 В — нижча/вища за допустиму." + "Від 14:12 напруга коливається в межах 140–166 В." | — |
 | silent | nothing (a real outage) | — |
 
+"Alive, voltage in range" looks back first: if the meter was out of range at any point since the time in
+Svitlobot's post («🔴 **09:09** Світло зникло», a minute early, at most 30 minutes back), it's a brownout that has
+just ended, not a false alarm: "⚡ Мережа є, але її параметри були поза нормою." + "Зараз напруга 185 В, а від 09:10
+вона опускалася до 174 В." (no private note), and the brownout is watched as usual.
+
 The allowed range itself isn't quoted in the posts: the real limits are on an offline voltage relay. The
 start of a brownout is the first out-of-range reading after the last normal one, read from the recorder,
 so it survives HA restarts.
 
-**After a reported brownout the meter is watched** (every 30 s) until Svitlobot posts «Світло з'явилося»:
+**After a post that says the grid is there** (a false alarm or a brownout) the meter is watched (every 30 s) until
+Svitlobot posts «Світло з'явилося»:
 
 - the meter goes silent (a real outage now; Svitlobot has nothing new to say, so the channel would still read "the
-  grid is there"): "🔴 Мережа зникла о 09:31." + "Перед тим з 09:00 напруга була поза нормою: 251–263 В.";
+  grid is there"): "🔴 Мережа зникла о 09:31.", after a brownout also "Перед тим з 09:00 напруга була поза нормою:
+  251–263 В.";
 - after that the meter comes back but out of range (a voltage relay keeps the line off, so the pinger and Svitlobot
   stay silent): "⚡ Мережа повернулась о 09:40, але напруга поза нормою." + "Напруга 255 В — вища за допустиму.".
   The brownout is watched again from there;

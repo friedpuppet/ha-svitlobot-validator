@@ -37,7 +37,11 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
 
 ## Status
 
-- Code and tests are done (`uv run pytest -q`). Version **0.3.0**: after a reported brownout the meter is watched until Svitlobot's «з'явилося» (v0.3.0, 2026-11-03, the
+- Code and tests are done (`uv run pytest -q`). Version **0.3.1**: the false alarm is watched too (store key
+  `alive_since`), after 2026-11-08: Svitlobot posted at 09:13:44 Kyiv while the grid was back for a minute (185 V), the
+  verdict was `false_alarm`, then the grid went for good at ~09:14 and v0.3.0 said nothing. Also since v0.3.1 an in-range voltage is a
+  false alarm only if the meter stayed in range since the time in Svitlobot's post (`post_time`, a minute early, ≤ 30 min);
+  otherwise it's a just-ended brownout («…були поза нормою»). That morning: 174–184 V from 09:10. v0.3.0: after a reported brownout the meter is watched until Svitlobot's «з'явилося» (v0.3.0, 2026-11-03, the
   user's call). If it goes silent: «🔴 Мережа зникла о HH:MM» + the brownout's range; if it then comes back out of
   range: «⚡ Мережа повернулась…». Store keys `brownout_since` / `outage_since`; sensor attribute `outage_since`.
   v0.2.1 dropped the `same_chat` check: a bot never gets its own posts.
