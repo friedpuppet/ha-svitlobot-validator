@@ -15,6 +15,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     CONF_FRESH_SECONDS,
+    CONF_GRID_ENTITY,
     CONF_OWNER_CHAT,
     CONF_PINGER_ENTITY,
     CONF_SOURCE_CHAT,
@@ -56,6 +57,9 @@ def _options_schema(defaults: dict[str, Any]) -> dict:
             selector.NumberSelectorConfig(min=10, max=3600, step=1, unit_of_measurement="s", mode=selector.NumberSelectorMode.BOX)
         ),
         vol.Optional(CONF_PINGER_ENTITY, description=_suggested(defaults, CONF_PINGER_ENTITY)): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="binary_sensor")
+        ),
+        vol.Optional(CONF_GRID_ENTITY, description=_suggested(defaults, CONF_GRID_ENTITY)): selector.EntitySelector(
             selector.EntitySelectorConfig(domain="binary_sensor")
         ),
     }

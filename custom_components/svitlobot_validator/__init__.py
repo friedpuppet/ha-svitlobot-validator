@@ -20,6 +20,7 @@ from .const import (
     ATTR_TEXT,
     CONF_FRESH_SECONDS,
     CONF_OWNER_CHAT,
+    CONF_GRID_ENTITY,
     CONF_PINGER_ENTITY,
     CONF_SOURCE_CHAT,
     CONF_TARGET_CHAT,
@@ -113,6 +114,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SvitlobotValidatorConfig
         voltage_max=opts.get(CONF_VOLTAGE_MAX, DEFAULT_VOLTAGE_MAX),
         fresh_seconds=opts.get(CONF_FRESH_SECONDS, DEFAULT_FRESH_SECONDS),
         pinger_entity=opts.get(CONF_PINGER_ENTITY) or None,
+        grid_entity=opts.get(CONF_GRID_ENTITY) or None,
         send=send,
         send_owner=send_owner if owner_chat else None,
     )

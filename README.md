@@ -40,7 +40,13 @@ Svitlobot posts «Світло з'явилося»:
 - after that the meter comes back but out of range (a voltage relay keeps the line off, so the pinger and Svitlobot
   stay silent): "⚡ Мережа повернулась о 09:40, але напруга поза нормою." + "Напруга 255 В — вища за допустиму.".
   The brownout is watched again from there;
-- the meter comes back in range: nothing; Svitlobot's own «Світло з'явилося» will be right.
+- the meter comes back in range: nothing at first; Svitlobot's own «Світло з'явилося» will be right. If Svitlobot
+  stays silent for 10 minutes of a good grid (a stuck pinger, Wi-Fi or Svitlobot itself): "✅ Мережа повернулась о
+  16:12, напруга в нормі: 230 В.", plus a private note with the pinger's state. When a brownout ends this way with no
+  outage in between, the post adds "З 09:09 до 16:12 напруга була поза нормою: …". After an outage it doesn't: the
+  outage post already gave the brownout's range, and the summary covers only what came after the outage. If the *inverter grid* sensor is set
+  and off (the building has the grid, the flat doesn't), only a private note goes out, and the channel post waits
+  until the inverter takes the grid. After the post the grid is watched as after a false alarm.
 
 Silence means no report for *Meter counts as alive for*, so the outage post comes 1–1.5 min late. Nothing is decided
 in the first *Meter counts as alive for* after HA starts, while the meter hasn't reported yet.

@@ -30,6 +30,8 @@ OUTAGE_RE = re.compile(r"Світло\s+зникло", re.IGNORECASE)
 RESTORED_RE = re.compile(r"Світло\s+з\W?явилося", re.IGNORECASE)
 # The time Svitlobot gives for the outage: "🔴 09:09 Світло зникло".
 POST_TIME_RE = re.compile(r"(\d{1,2}):(\d{2})\s+Світло", re.IGNORECASE)
+# The grid has been back and fine for this long, but Svitlobot hasn't said so: we do (it posts ~4–5 min late).
+RESTORE_WAIT = timedelta(minutes=10)
 # Svitlobot posts a few minutes late; a reported time further back than this is not trusted.
 POST_TIME_MAX_AGE = timedelta(minutes=30)
 
@@ -112,6 +114,7 @@ class Validator:
         voltage_max: float,
         fresh_seconds: float,
         pinger_entity: str | None,
+        grid_entity: str | None = None,
         send: Callable[[str], Awaitable[bool]],
         send_owner: Callable[[str], Awaitable[bool]] | None,
     ) -> None:
@@ -122,6 +125,7 @@ class Validator:
         self._vmax = voltage_max
         self._fresh = fresh_seconds
         self._pinger_entity = pinger_entity
+        self._grid_entity = grid_entity
         self._send = send
         self._send_owner = send_owner
         self._listeners: list[CALLBACK_TYPE] = []
@@ -152,6 +156,15 @@ class Validator:
         return self._time("alive_since")
 
     @property
+    def back_since(self) -> datetime | None:
+        """While a brownout or an outage is watched: since when the meter has been back and in range."""
+        return self._time("back_since")
+
+    def _set_back(self, when: datetime | None) -> None:
+        self._persisted.data["back_since"] = when.isoformat() if when else None
+        self._persisted.async_schedule_save()
+
+    @property
     def brownout(self) -> bool:
         return self.brownout_since is not None
 
@@ -168,6 +181,8 @@ class Validator:
     ) -> None:
         for key, value in (("alive_since", alive_since), ("brownout_since", brownout_since), ("outage_since", outage_since)):
             self._persisted.data[key] = value.isoformat() if value else None
+        self._persisted.data["back_since"] = None
+        self._persisted.data["inverter_note_sent"] = False
         self._persisted.async_schedule_save()
         if self.watching and self._unsub_watch is None:
             self._unsub_watch = async_track_time_interval(self.hass, self._watch_check, WATCH_INTERVAL)
@@ -252,10 +267,13 @@ class Validator:
                 lines.append(f"Перед тим з {_hhmm(since)} напруга була поза нормою: {_span(bad)}.")
             _LOGGER.info("The reported brownout turned into an outage at %s", when)
             await self._send("\n".join(lines))
+        elif (self.outage_since or self.brownout_since) and voltage is not None and self._in_range(voltage):
+            await self._back_in_range()
+        elif self.brownout_since is not None and voltage is not None:
+            self._set_back(None)  # out of range again
+        elif voltage is None and self.back_since is not None:
+            self._set_back(None)  # silent again
         elif self.outage_since is not None and voltage is not None:
-            if self._in_range(voltage):
-                self._set_watch()  # the power is back and fine; Svitlobot will say so itself
-                return
             state = self.hass.states.get(self._voltage_entity)
             back = min(state.last_reported, dt_util.utcnow()) if state else dt_util.utcnow()
             self._set_watch(brownout_since=back)
@@ -263,6 +281,37 @@ class Validator:
             await self._send(
                 f"⚡ Мережа повернулась о {_hhmm(back)}, але напруга поза нормою.\n{self._voltage_detail(voltage)}"
             )
+
+    async def _back_in_range(self) -> None:
+        """The grid is back and fine; if Svitlobot stays silent for ``RESTORE_WAIT``, say so ourselves."""
+        now = dt_util.utcnow()
+        if (back := self.back_since) is None:
+            state = self.hass.states.get(self._voltage_entity)
+            self._set_back(min(state.last_reported, now) if state else now)
+            return
+        if now - back < RESTORE_WAIT:
+            return
+        voltage = self.meter_voltage()
+        if self._grid_entity and (grid := self.hass.states.get(self._grid_entity)) and grid.state != STATE_ON:
+            # The building has the grid, the flat doesn't (the relay or the inverter): Svitlobot is right.
+            if not self._persisted.data.get("inverter_note_sent"):
+                self._persisted.data["inverter_note_sent"] = True
+                self._persisted.async_schedule_save()
+                if self._send_owner:
+                    await self._send_owner(
+                        f"🔧 Лічильник перед інвертором бачить {_volts(voltage)} з {_hhmm(back)}, "
+                        "а інвертор мережу не приймає."
+                    )
+            return
+        brownout_since = self.brownout_since
+        self._set_watch(alive_since=back)  # Svitlobot still thinks it's dark: a later outage must be posted too
+        lines = [f"✅ Мережа повернулась о {_hhmm(back)}, напруга в нормі: {_volts(voltage)}."]
+        if brownout_since is not None and (bad := (await self._bad_stretch(brownout_since))[0]):
+            lines.append(f"З {_hhmm(brownout_since)} до {_hhmm(back)} напруга була поза нормою: {_span(bad)}.")
+        _LOGGER.info("The grid is back since %s and Svitlobot hasn't said so", back)
+        await self._send("\n".join(lines))
+        if self._send_owner:
+            await self._send_owner("\n".join(["ℹ️ Світлобот досі не написав «Світло з'явилося».", *self._pinger_lines()]))
 
     async def _bad_stretch(self, since: datetime) -> tuple[list[float], datetime | None]:
         """Out-of-range readings from ``since`` to the last one, and when the stretch ended (the next good reading)."""
@@ -398,9 +447,11 @@ class Validator:
             f"🔧 Світлобот написав «Світло зникло», але лічильник перед інвертором показує {_volts(voltage)}. "
             "Ймовірно, збій у вас."
         ]
+        return "\n".join([*lines, *self._pinger_lines()])
+
+    def _pinger_lines(self) -> list[str]:
         if self._pinger_entity and (pinger := self.hass.states.get(self._pinger_entity)):
             if pinger.state == STATE_ON:
-                lines.append("Пінгер на зв'язку — схоже, збій Світлобота.")
-            else:
-                lines.append(f"Пінгер не відповідає з {_hhmm(pinger.last_changed)}.")
-        return "\n".join(lines)
+                return ["Пінгер на зв'язку — схоже, збій Світлобота."]
+            return [f"Пінгер не відповідає з {_hhmm(pinger.last_changed)}."]
+        return []

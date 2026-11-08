@@ -321,15 +321,91 @@ async def test_outage_then_back_out_of_range(hass: HomeAssistant, bot, freezer) 
     )
 
 
-async def test_outage_then_back_in_range_is_silent(hass: HomeAssistant, bot, freezer) -> None:
+async def keep_reporting(hass: HomeAssistant, freezer, volts: str, minutes: float) -> None:
+    """The meter reports every 30 s (it counts as alive for 60 s)."""
+    for _ in range(int(minutes * 2)):
+        hass.states.async_set(VOLTAGE, volts)
+        await tick(hass, freezer, 30)
+
+
+async def test_outage_then_back_in_range_with_svitlobot_on_time(hass: HomeAssistant, bot, freezer) -> None:
     await start_brownout_then_lose_the_meter(hass, bot, freezer)
 
-    hass.states.async_set(VOLTAGE, "225")
-    await tick(hass, freezer, 30)
+    await keep_reporting(hass, freezer, "225", 5)
     assert len(bot.sent) == 2
+    await bot.feed(hass, [channel_post(RESTORED)])
     attributes = hass.states.get(VERDICT).attributes
-    assert attributes["brownout"] is False
     assert attributes["outage_since"] is None
+    assert attributes["brownout"] is False
+
+    await keep_reporting(hass, freezer, "225", 15)
+    assert len(bot.sent) == 2
+
+
+async def test_outage_then_back_in_range_without_svitlobot(hass: HomeAssistant, bot, freezer) -> None:
+    """The pinger or Svitlobot is stuck: after 10 min of a good grid we say it's back."""
+    hass.states.async_set(PINGER, "off")
+    await start_brownout_then_lose_the_meter(hass, bot, freezer)
+    await tick(hass, freezer, 600)
+
+    hass.states.async_set(VOLTAGE, "225")
+    back = hhmm()
+    await keep_reporting(hass, freezer, "225", 9.5)
+    assert len(bot.sent) == 2
+
+    await keep_reporting(hass, freezer, "225", 1)
+    assert bot.sent[2] == (TARGET, f"✅ Мережа повернулась о {back}, напруга в нормі: 225 В.")
+    assert bot.sent[3][0] == OWNER
+    assert bot.sent[3][1].startswith("ℹ️ Світлобот досі не написав «Світло з'явилося».\nПінгер не відповідає з ")
+    assert hass.states.get(VERDICT).attributes["alive_since"] is not None
+
+    await keep_reporting(hass, freezer, "225", 5)
+    assert len(bot.sent) == 4
+    await bot.feed(hass, [channel_post(RESTORED)])  # Svitlobot catches up: nothing to add
+    assert len(bot.sent) == 4
+    assert hass.states.get(VERDICT).attributes["alive_since"] is None
+
+
+async def test_brownout_ends_without_svitlobot(hass: HomeAssistant, bot, freezer) -> None:
+    hass.states.async_set(VOLTAGE, "150")
+    started = hhmm()
+    await setup_entry(hass, make_entry(owner_chat=None))
+    await bot.feed(hass, [channel_post(OUTAGE)])
+    await keep_reporting(hass, freezer, "150", 3)
+
+    hass.states.async_set(VOLTAGE, "200")
+    back = hhmm()
+    await keep_reporting(hass, freezer, "200", 3)
+    hass.states.async_set(VOLTAGE, "160")  # a dip restarts the wait
+    await keep_reporting(hass, freezer, "160", 0.5)
+    hass.states.async_set(VOLTAGE, "210")
+    back = hhmm()
+    await keep_reporting(hass, freezer, "210", 10.5)
+    assert bot.sent[1] == (
+        TARGET,
+        f"✅ Мережа повернулась о {back}, напруга в нормі: 210 В.\nЗ {started} до {back} напруга була поза нормою: 150–160 В.",
+    )
+    assert len(bot.sent) == 2
+
+
+async def test_flat_still_dark_only_a_private_note(hass: HomeAssistant, bot, freezer) -> None:
+    """The building has the grid, but the inverter hasn't taken it: Svitlobot is right."""
+    grid = "binary_sensor.grid"
+    hass.states.async_set(grid, "off")
+    hass.states.async_set(VOLTAGE, "150")
+    await setup_entry(hass, make_entry(grid_entity=grid))
+    await bot.feed(hass, [channel_post(OUTAGE)])
+    await tick(hass, freezer, 90)
+    assert len(bot.sent) == 2  # the outage post
+
+    hass.states.async_set(VOLTAGE, "225")
+    back = hhmm()
+    await keep_reporting(hass, freezer, "225", 15)
+    assert bot.sent[2:] == [(OWNER, f"🔧 Лічильник перед інвертором бачить 225 В з {back}, а інвертор мережу не приймає.")]
+
+    hass.states.async_set(grid, "on")
+    await keep_reporting(hass, freezer, "225", 1)
+    assert bot.sent[3] == (TARGET, f"✅ Мережа повернулась о {back}, напруга в нормі: 225 В.")
 
 
 async def test_no_outage_post_right_after_a_restart(hass: HomeAssistant, bot, freezer) -> None:

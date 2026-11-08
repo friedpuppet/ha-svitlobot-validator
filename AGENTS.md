@@ -37,7 +37,10 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
 
 ## Status
 
-- Code and tests are done (`uv run pytest -q`). Version **0.3.1**: the false alarm is watched too (store key
+- Code and tests are done (`uv run pytest -q`). Version **0.3.2**: if the grid is back and in range for 10 min
+  (`RESTORE_WAIT`) during a brownout/outage watch and Svitlobot hasn't posted «з'явилося», «✅ Мережа повернулась…» goes to
+  the channel plus a private note (pinger state); with option `grid_entity` (live: `binary_sensor.e_elektrika`) off,
+  only a private note «…інвертор мережу не приймає» (store keys `back_since`, `inverter_note_sent`). v0.3.1: the false alarm is watched too (store key
   `alive_since`), after 2026-11-08: Svitlobot posted at 09:13:44 Kyiv while the grid was back for a minute (185 V), the
   verdict was `false_alarm`, then the grid went for good at ~09:14 and v0.3.0 said nothing. Also since v0.3.1 an in-range voltage is a
   false alarm only if the meter stayed in range since the time in Svitlobot's post (`post_time`, a minute early, ≤ 30 min);

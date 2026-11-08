@@ -14,7 +14,8 @@
           "voltage_max": "Highest acceptable voltage",
           "fresh_seconds": "Meter counts as alive for",
           "owner_chat": "Notify me privately",
-          "pinger_entity": "Pinger"
+          "pinger_entity": "Pinger",
+          "grid_entity": "Inverter grid"
         },
         "data_description": {
           "token": "From @BotFather. The bot reads the Svitlobot channel and posts the verdicts.",
@@ -25,7 +26,8 @@
           "voltage_max": "Usually the inverter's highest accepted grid voltage.",
           "fresh_seconds": "The meter is considered powered while its last report is at most this old.",
           "owner_chat": "Optional. Your Telegram user id (or @username). Press Start in the bot first, otherwise it can't message you. You get a note when the grid is fine but Svitlobot reports an outage (a pinger or Svitlobot glitch).",
-          "pinger_entity": "Optional. Binary sensor that is on while the device pinging Svitlobot is reachable; its state goes into the private note."
+          "pinger_entity": "Optional. Binary sensor that is on while the device pinging Svitlobot is reachable; its state goes into the private note.",
+          "grid_entity": "Optional. Binary sensor that is on while the inverter takes the grid. If the meter shows the grid back but this is off, the flat is still without power: only a private note is sent."
         }
       }
     },
@@ -50,7 +52,8 @@
           "voltage_max": "Highest acceptable voltage",
           "fresh_seconds": "Meter counts as alive for",
           "owner_chat": "Notify me privately",
-          "pinger_entity": "Pinger"
+          "pinger_entity": "Pinger",
+          "grid_entity": "Inverter grid"
         },
         "data_description": {
           "source_chat": "Chat id (-100…) or @username of the channel Svitlobot posts to.",
@@ -60,7 +63,8 @@
           "voltage_max": "Usually the inverter's highest accepted grid voltage.",
           "fresh_seconds": "The meter is considered powered while its last report is at most this old.",
           "owner_chat": "Optional. Your Telegram user id (or @username). Press Start in the bot first, otherwise it can't message you. You get a note when the grid is fine but Svitlobot reports an outage (a pinger or Svitlobot glitch).",
-          "pinger_entity": "Optional. Binary sensor that is on while the device pinging Svitlobot is reachable; its state goes into the private note."
+          "pinger_entity": "Optional. Binary sensor that is on while the device pinging Svitlobot is reachable; its state goes into the private note.",
+          "grid_entity": "Optional. Binary sensor that is on while the inverter takes the grid. If the meter shows the grid back but this is off, the flat is still without power: only a private note is sent."
         }
       }
     },
