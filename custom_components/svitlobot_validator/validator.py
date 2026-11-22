@@ -100,8 +100,9 @@ def _range_text(values: list[float]) -> str:
 class Validator:
     """Decides what a Svitlobot post really means and reports it.
 
-    The meter before the inverter shows what the building gets. Our own grid sensor is the
-    inverter's view and is deliberately not used: an inverter problem isn't a grid problem.
+    The meter before the inverter shows what the building gets, and it alone gives the verdict. The
+    optional inverter grid sensor is the flat's view: it only holds back the "grid is back" post while
+    the inverter hasn't taken the grid yet (an inverter problem isn't a grid problem).
     """
 
     def __init__(

@@ -1,6 +1,6 @@
 # Svitlobot Validator
 
-> Personal project, published only so it can be installed through HACS as a custom repository.
+> Personal project, published only so it can be installed through the Home Assistant Marketplace (formerly HACS) as a custom repository.
 > Use it if it's useful to you, but there's no support and no promise of stability.
 
 A Home Assistant integration that double-checks [Svitlobot](https://svitlobot.in.ua)'s Telegram posts.
@@ -11,8 +11,8 @@ powered straight from the grid** (e.g. a Zigbee meter before the inverter). Whil
 is physically there. A mains-powered meter goes silent in an outage, but HA may keep its last value for a while,
 so "alive" means it reported within *Meter counts as alive for* (default 60 s).
 
-Only the meter decides. An inverter-based grid sensor is deliberately not used: an inverter problem isn't a
-grid problem.
+The meter alone gives the verdict on Svitlobot's posts. An inverter-based grid sensor is not used for that: an
+inverter problem isn't a grid problem. It is used, optionally, only when the grid comes back (see *inverter grid* below).
 
 **"🔴 … Світло зникло"**
 
@@ -64,7 +64,8 @@ down) are not checked.
    to the chat that should get the verdicts.
 2. Add the integration: bot token, Svitlobot channel and target chat (`-100…` id or `@username`), meter
    voltage, allowed voltage range (default 170–280 V, the usual inverter UPS range). Optional: your own user id
-   for private notes (press **Start** in the bot first, or it can't message you) and the pinger's binary sensor.
+   for private notes (press **Start** in the bot first, or it can't message you), the pinger's binary sensor and the
+   *inverter grid* binary sensor (on while the inverter takes the grid).
 
 The bot uses long polling (`getUpdates`), so it must not have a webhook set, and nothing else should poll
 updates with the same token.
@@ -72,7 +73,7 @@ updates with the same token.
 ## Entities and services
 
 - `sensor.<name>_last_verdict`: `none` / `false_alarm` / `out_of_range` / `confirmed`; attributes
-  `checked_at`, `post_link`, `voltage`, `message`, `brownout`.
+  `checked_at`, `post_link`, `voltage`, `message`, `brownout`, `outage_since`, `alive_since` (the watch after a post).
 - `button.<name>_send_test_message`: posts a test message to the target chat.
 - `svitlobot_validator.check` (`text`): check a text as if Svitlobot had posted it, for testing (a bot
   never receives its own posts). Returns the verdicts (`back_to_normal` for a summed-up brownout).

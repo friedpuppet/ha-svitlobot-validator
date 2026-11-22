@@ -3,25 +3,28 @@
 Subproject of `homeassistant`. This is the HA custom integration **`svitlobot_validator`** ("Svitlobot
 Validator"). It reads @SvitloUkraineBot's posts in the channel `@svitlobot_kyiv_dashkevycha_4` through our bot and checks every
 "🔴 … Світло зникло" against the ZHA meter before the inverter
-(`sensor.lichilnik_pered_invertorom_napruga`) only. Behaviour is in `README.md`.
+(`sensor.lichilnik_pered_invertorom_napruga`) only; since v0.3.2 the optional `grid_entity` holds back the "grid is
+back" post while the inverter hasn't taken the grid. Behaviour is in `README.md`.
+
+**The repo is public: no personal data in it** (same rule as `../meter-bots/`). Real chat/user/bot ids and HA entry ids
+live in `../AGENTS.md` («Svitlobot channel check»); here they are named by role. History was rewritten on 2026-11-22 to
+drop them; the local branch `private-history` keeps the old history, never push it.
 
 ## Shared Home Assistant context
 
-Read `../AGENTS.md` (host, SSH, API token, backups), `../electricity.md` (grid sensor chain) and
-`../grid-load-shedding/AGENTS.md` (the sibling integration this one mirrors: layout, release, HACS via WS).
+Read `../AGENTS.md` (host, SSH, API token, backups, this integration's ids), `../electricity.md` (grid sensor chain) and
+`../grid-load-shedding/AGENTS.md` (the sibling integration this one mirrors: layout, release, Marketplace via WS).
 
 ## Telegram
 
-- Bot **@kyiv_dashkevycha_4_svitlo_bot** (id `<bot id>`). Its token is in the disabled Power Watchdog entry
-  (`<Power Watchdog entry id>`, `.storage/core.config_entries`, `options.telegram_token`) and in this entry's data.
-  The bot is an admin in all three chats below. It uses `getUpdates` long polling: there must be no webhook, and
-  nothing else may poll this token.
-- Chats:
-  | Chat | Id | Role |
-  |---|---|---|
-  | СвітлоБот ⚡ Київ, Дашкевича, 4 (`@svitlobot_kyiv_dashkevycha_4`) | `<main channel id>` | **source and target** since v0.2.1 (2026-11-02, the user's go-ahead): Svitlobot posts here, and so do the verdicts. Tests don't belong here |
-  | Тест для світлобота | `<test channel id>` | the target until 2026-11-02, now for manual tests only |
-  | s4_svitlo_test (`@d4_svitlo_test`) | `<old test channel id>` | the user's older test channel, unused |
+- Bot **@kyiv_dashkevycha_4_svitlo_bot**. Its token is in this entry's data. The bot is an admin in all three chats
+  below. It uses `getUpdates` long polling: there must be no webhook, and nothing else may poll this token.
+- Chats (ids in `../AGENTS.md`):
+  | Chat | Role |
+  |---|---|
+  | СвітлоБот ⚡ Київ, Дашкевича, 4 (`@svitlobot_kyiv_dashkevycha_4`) | **source and target** since v0.2.1 (2026-11-02, the user's go-ahead): Svitlobot posts here, and so do the verdicts |
+  | Тест для світлобота | the target until 2026-11-02, now for manual tests only (switch the target to it first) |
+  | `@d4_svitlo_test` | the user's older test channel, unused |
 - A bot never receives its own posts. To test, use the `svitlobot_validator.check` service, or have the user post into
   the source channel.
 - Svitlobot formats (2026-10): `🔴 HH:MM Світло зникло`, `🟢 HH:MM Світло з'явилося`, `🗓️Графік відключень…`. Only
@@ -37,7 +40,7 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
 
 ## Status
 
-- Code and tests are done (`uv run pytest -q`). Version **0.3.2**: if the grid is back and in range for 10 min
+- Code and tests are done (`uv run pytest -q`). Version **0.3.3** (docs/strings only; 0.3.2's behaviour): if the grid is back and in range for 10 min
   (`RESTORE_WAIT`) during a brownout/outage watch and Svitlobot hasn't posted «з'явилося», «✅ Мережа повернулась…» goes to
   the channel plus a private note (pinger state); with option `grid_entity` (live: `binary_sensor.e_elektrika`) off,
   only a private note «…інвертор мережу не приймає» (store keys `back_since`, `inverter_note_sent`). v0.3.1: the false alarm is watched too (store key
@@ -48,14 +51,14 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
   user's call). If it goes silent: «🔴 Мережа зникла о HH:MM» + the brownout's range; if it then comes back out of
   range: «⚡ Мережа повернулась…». Store keys `brownout_since` / `outage_since`; sensor attribute `outage_since`.
   v0.2.1 dropped the `same_chat` check: a bot never gets its own posts.
-- **Installed on the live HA (2026-10-08)** via HACS custom repository (HACS repo id `1410267100`), entry «Світлобот»
-  `<entry id>` (created through the config flow REST API). Source and target `<main channel id>` (target was
-  `<test channel id>` until 2026-11-02), meter `sensor.lichilnik_pered_invertorom_napruga`, 170–280 V, 60 s.
+- **Installed on the live HA (2026-10-08)** as a custom repository (Marketplace repo id `1410267100`), entry «Світлобот»
+  (created through the config flow REST API). Source and target the main channel (target was the test channel until
+  2026-11-02), meter `sensor.lichilnik_pered_invertorom_napruga`, 170–280 V, 60 s.
   170–280 V is a placeholder (the inverter's approximate UPS range from `../electricity.md`); the real limits are on the
-  offline voltage relay, and the user will set them in the options flow himself.
+  offline voltage relay, and the user will set them in the options flow.
   - Entities: `sensor.svitlobot_last_verdict`, `button.svitlobot_send_test_message`; service `svitlobot_validator.check`.
   - State (offset, brownout flag, last verdict): `.storage/svitlobot_validator.<entry_id>`.
-  - **Updating**: release (bump `manifest.json` + `pyproject.toml`), then WS `hacs/repository/download` with
+  - **Updating**: release (bump `manifest.json` + `pyproject.toml`), then WS `marketplace/repository/install` with
     `repository: "1410267100"`, `version: "vX.Y.Z"`, then `ha core check` + `ha core restart`.
   - v0.1.0 never polled: Telegram's `timeout` param clashed with `_call`'s HTTP timeout (tests used a fake bot).
     Fixed in v0.1.1, plus `tests/test_telegram.py` against a mocked API.
@@ -67,18 +70,20 @@ is mains-powered, but ZHA marks such devices unavailable only after ~2 h, so "me
   - Since v0.1.4 the posts carry no link to the Svitlobot post and don't quote the 170–280 V range ("нижча/вища за
     допустиму" only): the real limits are set on an offline voltage relay that HA can't see (the user's call). The
     range options still decide below/above/within; `post_link` stays a sensor attribute.
-  - **Meter only** since v0.2.0 (the user's call): `e_elektrika` is the *inverter's* view (inverter grid voltage >
-    170 V, pinger as fallback; the meter isn't in that chain), so it's not used at all. Meter alive + in range →
-    false alarm in the channel **plus a private note to the user** (id `123456789`, @owner, `owner_chat`) with the
+  - **Meter only for the verdict** since v0.2.0 (the user's call): `e_elektrika` is the *flat's* view (Deye > 184 V and
+    its grid relay on; the meter isn't in that chain), so it doesn't decide a verdict; since v0.3.2 it is `grid_entity`,
+    used only for the "grid is back" post. Meter alive + in range →
+    false alarm in the channel **plus a private note to the user** (`owner_chat`) with the
     pinger's state (`binary_sensor.esp_svitlobot_pinger_local`): a pinger or Svitlobot glitch isn't the channel's
     business. Meter alive + out of range → brownout post. Meter silent → silent.
   - Brownout start = first out-of-range meter reading after the last normal one (recorder, `unavailable` gaps
     skipped). The "back to normal" summary is sent when Svitlobot posts «Світло з'явилося» (the user's call), with
     "З HH:MM до HH:MM напруга була поза нормою: lo–hi В".
-  - **The test button and `check` now post into the live channel**: switch the target back to the test channel first.
-  - Verified live 2026-10-08: polling works (offset stored), the test button and `check` (→ `false_alarm`) post into
-    the test channel. The brownout and back-to-normal branches haven't been seen live yet.
-- Repo: **friedpuppet/ha-svitlobot-validator** (public, for HACS only; same "personal project" rules and PAT
+  - **The test button and `check` post into the target, which is the live channel since v0.2.1**: switch the target to
+    the test channel first.
+  - Verified live 2026-10-08 (target was the test channel then): polling works (offset stored), the test button and
+    `check` (→ `false_alarm`) posted there.
+- Repo: **friedpuppet/ha-svitlobot-validator** (public, for the Marketplace only; same "personal project" rules and PAT
   `~/.config/github/token-grid-load-shedding` as `../grid-load-shedding/AGENTS.md`).
 
 ## Dev

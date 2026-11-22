@@ -21,7 +21,7 @@
           "token": "From @BotFather. The bot reads the Svitlobot channel and posts the verdicts.",
           "source_chat": "Chat id (-100…) or @username of the channel Svitlobot posts to.",
           "target_chat": "Chat id (-100…) or @username of the chat that gets the verdicts.",
-          "voltage_entity": "Voltage of a meter powered straight from the grid (e.g. before the inverter). While it keeps reporting, the grid is physically there; it alone decides.",
+          "voltage_entity": "Voltage of a meter powered straight from the grid (e.g. before the inverter). While it keeps reporting, the grid is physically there; it alone gives the verdict.",
           "voltage_min": "Usually the inverter's lowest accepted grid voltage.",
           "voltage_max": "Usually the inverter's highest accepted grid voltage.",
           "fresh_seconds": "The meter is considered powered while its last report is at most this old.",
@@ -58,7 +58,7 @@
         "data_description": {
           "source_chat": "Chat id (-100…) or @username of the channel Svitlobot posts to.",
           "target_chat": "Chat id (-100…) or @username of the chat that gets the verdicts.",
-          "voltage_entity": "Voltage of a meter powered straight from the grid (e.g. before the inverter). While it keeps reporting, the grid is physically there; it alone decides.",
+          "voltage_entity": "Voltage of a meter powered straight from the grid (e.g. before the inverter). While it keeps reporting, the grid is physically there; it alone gives the verdict.",
           "voltage_min": "Usually the inverter's lowest accepted grid voltage.",
           "voltage_max": "Usually the inverter's highest accepted grid voltage.",
           "fresh_seconds": "The meter is considered powered while its last report is at most this old.",
